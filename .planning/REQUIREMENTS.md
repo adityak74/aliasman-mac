@@ -76,36 +76,36 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| FND-01 | TBD | Pending |
-| FND-02 | TBD | Pending |
-| FND-03 | TBD | Pending |
-| FND-04 | TBD | Pending |
-| SHL-01 | TBD | Pending |
-| SHL-02 | TBD | Pending |
-| SHL-03 | TBD | Pending |
-| SHL-04 | TBD | Pending |
-| SHL-05 | TBD | Pending |
-| ALS-01 | TBD | Pending |
-| ALS-02 | TBD | Pending |
-| ALS-03 | TBD | Pending |
-| ALS-04 | TBD | Pending |
-| ALS-05 | TBD | Pending |
-| HST-01 | TBD | Pending |
-| HST-02 | TBD | Pending |
-| HST-03 | TBD | Pending |
-| HST-04 | TBD | Pending |
-| HST-05 | TBD | Pending |
-| CLD-01 | TBD | Pending |
-| CLD-02 | TBD | Pending |
-| CLD-03 | TBD | Pending |
-| CLD-04 | TBD | Pending |
-| CLD-05 | TBD | Pending |
+| FND-01 | Phase 1 | Pending |
+| FND-02 | Phase 1 | Pending |
+| FND-03 | Phase 1 | Pending |
+| FND-04 | Phase 1 | Pending |
+| SHL-01 | Phase 2 | Pending |
+| SHL-02 | Phase 2 | Pending |
+| SHL-03 | Phase 2 | Pending |
+| SHL-04 | Phase 2 | Pending |
+| SHL-05 | Phase 2 | Pending |
+| ALS-01 | Phase 3 | Pending |
+| ALS-02 | Phase 3 | Pending |
+| ALS-03 | Phase 3 | Pending |
+| ALS-04 | Phase 3 | Pending |
+| ALS-05 | Phase 3 | Pending |
+| HST-01 | Phase 4 | Pending |
+| HST-02 | Phase 4 | Pending |
+| HST-03 | Phase 4 | Pending |
+| HST-04 | Phase 4 | Pending |
+| HST-05 | Phase 4 | Pending |
+| CLD-01 | Phase 5 | Pending |
+| CLD-02 | Phase 5 | Pending |
+| CLD-03 | Phase 5 | Pending |
+| CLD-04 | Phase 5 | Pending |
+| CLD-05 | Phase 5 | Pending |
 
 **Coverage:**
 - v0.0.1 requirements: 24 total
-- Mapped to phases: 0
-- Unmapped: 24
+- Mapped to phases: 24
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-05-11*
-*Last updated: 2026-05-11 after initial definition*
+*Last updated: 2026-05-11 after roadmap creation*
