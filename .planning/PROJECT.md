@@ -8,6 +8,17 @@ A Rust CLI that makes shell alias management a first-class developer experience.
 
 Developers never have to manually edit shell config files to manage aliases — and their AI coding assistant knows and uses those same aliases.
 
+## Current Milestone: v0.0.1 CLI Alias Manager MVP
+
+**Goal:** Build the first usable aliasman release: a Rust CLI for managing shell aliases safely, with zsh/bash support, history-based suggestions and stats, and Claude Code hook injection.
+
+**Target features:**
+- CLI alias CRUD: add, update, delete, and list aliases through named CLI flags
+- Shell integration: detect zsh/bash/bash_profile aliases and manage a dedicated alias file safely
+- History intelligence: suggest short aliases for frequent commands and show command frequency analytics
+- CLI ergonomics: console help, options, arguments, and shell workflow hints
+- Claude integration: install a Claude Code hook that injects relevant aliases into context without dumping everything
+
 ## Requirements
 
 ### Validated
@@ -77,4 +88,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-05-10 after initialization*
+*Last updated: 2026-05-11 after starting milestone v0.0.1*
