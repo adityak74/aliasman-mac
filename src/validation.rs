@@ -42,8 +42,7 @@ pub fn validate_alias_name(name: &str) -> Result<(), ValidationError> {
 pub fn is_protected_name(name: &str) -> bool {
     matches!(
         name,
-        "rm"
-            | "mv"
+        "rm" | "mv"
             | "cp"
             | "ln"
             | "chmod"
@@ -76,4 +75,44 @@ pub fn validate_alias_name_for_write(name: &str, force: bool) -> Result<(), Vali
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn accepts_valid_alias_names() {
+        assert!(validate_alias_name("gs").is_ok());
+        assert!(validate_alias_name("_local").is_ok());
+        assert!(validate_alias_name("git-status").is_ok());
+        assert!(validate_alias_name("g1").is_ok());
+    }
+
+    #[test]
+    fn rejects_invalid_alias_names() {
+        assert!(validate_alias_name("1bad").is_err());
+        assert!(validate_alias_name("bad name").is_err());
+        assert!(validate_alias_name("bad$name").is_err());
+        assert!(validate_alias_name("").is_err());
+    }
+
+    #[test]
+    fn protected_names_require_force_for_write() {
+        // Protected names without force should fail
+        assert!(validate_alias_name_for_write("rm", false).is_err());
+        assert!(validate_alias_name_for_write("sudo", false).is_err());
+        assert!(validate_alias_name_for_write("git", false).is_err());
+        assert!(validate_alias_name_for_write("curl", false).is_err());
+
+        // Protected names with force should pass
+        assert!(validate_alias_name_for_write("rm", true).is_ok());
+        assert!(validate_alias_name_for_write("sudo", true).is_ok());
+        assert!(validate_alias_name_for_write("git", true).is_ok());
+        assert!(validate_alias_name_for_write("curl", true).is_ok());
+
+        // Non-protected names should always pass (syntax valid)
+        assert!(validate_alias_name_for_write("gs", false).is_ok());
+        assert!(validate_alias_name_for_write("gs", true).is_ok());
+    }
 }

@@ -101,3 +101,88 @@ pub fn write_managed_aliases(path: &Path, store: &AliasStore) -> Result<(), Stor
     let rendered = render_aliases_file(store);
     write_atomic(path, &rendered)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::model::{AliasShell, AliasSource};
+
+    fn make_sample_record() -> AliasRecord {
+        AliasRecord {
+            name: "gs".to_string(),
+            command: "git status".to_string(),
+            description: Some("Quick git status".to_string()),
+            tags: vec!["git".to_string()],
+            shell: AliasShell::All,
+            source: AliasSource::User,
+            created_at: 1715300000,
+            updated_at: 1715300000,
+        }
+    }
+
+    #[test]
+    fn serializes_and_deserializes_alias_store() {
+        let store = AliasStore {
+            aliases: vec![make_sample_record()],
+        };
+
+        let toml_str = store.to_toml().expect("serialization should succeed");
+        let deserialized =
+            AliasStore::from_toml(&toml_str).expect("deserialization should succeed");
+
+        assert_eq!(store, deserialized);
+    }
+
+    #[test]
+    fn renders_aliases_in_name_order() {
+        let store = AliasStore {
+            aliases: vec![
+                AliasRecord {
+                    name: "z_last".to_string(),
+                    command: "echo z".to_string(),
+                    description: None,
+                    tags: vec![],
+                    shell: AliasShell::All,
+                    source: AliasSource::User,
+                    created_at: 0,
+                    updated_at: 0,
+                },
+                AliasRecord {
+                    name: "a_first".to_string(),
+                    command: "echo a".to_string(),
+                    description: None,
+                    tags: vec![],
+                    shell: AliasShell::All,
+                    source: AliasSource::User,
+                    created_at: 0,
+                    updated_at: 0,
+                },
+            ],
+        };
+
+        let rendered = render_aliases_file(&store);
+        let a_pos = rendered.find("alias a_first='echo a'").unwrap();
+        let z_pos = rendered.find("alias z_last='echo z'").unwrap();
+
+        assert!(a_pos < z_pos, "aliases should be sorted by name");
+    }
+
+    #[test]
+    fn escapes_single_quotes_in_alias_commands() {
+        let store = AliasStore {
+            aliases: vec![AliasRecord {
+                name: "x".to_string(),
+                command: "echo 'hi'".to_string(),
+                description: None,
+                tags: vec![],
+                shell: AliasShell::All,
+                source: AliasSource::User,
+                created_at: 0,
+                updated_at: 0,
+            }],
+        };
+
+        let rendered = render_aliases_file(&store);
+        assert!(rendered.contains("alias x='echo '\\''hi'\\'''"));
+    }
+}
