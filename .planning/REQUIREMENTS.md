@@ -45,6 +45,14 @@
 - [ ] **CLD-04**: The Claude hook respects a configurable token budget for injected context.
 - [ ] **CLD-05**: The Claude hook exits cleanly with no noisy output when no alias context should be injected.
 
+### Semantic Search
+
+- [ ] **SEM-01**: User aliases are embedded locally and indexed in a LanceDB-backed vector store.
+- [ ] **SEM-02**: aliasman can refresh the semantic alias index when aliases are added, updated, deleted, imported, or suggested.
+- [ ] **SEM-03**: User can search aliases semantically from the CLI using natural-language queries.
+- [ ] **SEM-04**: Claude can search aliases semantically through a local MCP tool/server instead of relying only on hook-injected context.
+- [ ] **SEM-05**: Semantic search runs locally by default and does not send alias commands or metadata to remote embedding services unless the user explicitly configures that later.
+
 ## Future Requirements
 
 ### Shells
@@ -100,12 +108,17 @@
 | CLD-03 | Phase 5 | Pending |
 | CLD-04 | Phase 5 | Pending |
 | CLD-05 | Phase 5 | Pending |
+| SEM-01 | Phase 6 | Pending |
+| SEM-02 | Phase 6 | Pending |
+| SEM-03 | Phase 6 | Pending |
+| SEM-04 | Phase 6 | Pending |
+| SEM-05 | Phase 6 | Pending |
 
 **Coverage:**
-- v0.0.1 requirements: 24 total
-- Mapped to phases: 24
+- v0.0.1 requirements: 29 total
+- Mapped to phases: 29
 - Unmapped: 0
 
 ---
 *Requirements defined: 2026-05-11*
-*Last updated: 2026-05-11 after roadmap creation*
+*Last updated: 2026-05-11 after adding Phase 6 semantic search*

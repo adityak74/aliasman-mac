@@ -18,6 +18,7 @@ Developers never have to manually edit shell config files to manage aliases — 
 - History intelligence: suggest short aliases for frequent commands and show command frequency analytics
 - CLI ergonomics: console help, options, arguments, and shell workflow hints
 - Claude integration: install a Claude Code hook that injects relevant aliases into context without dumping everything
+- Local semantic search: embed aliases locally, index them with LanceDB, and expose semantic alias lookup to Claude through MCP
 
 ## Requirements
 
@@ -34,6 +35,8 @@ Developers never have to manually edit shell config files to manage aliases — 
 - [ ] aliasman shows shell history statistics and command frequency analytics
 - [ ] Claude Code hook fires on session start and injects contextually relevant aliases
 - [ ] Hook uses smart filtering — only injects aliases relevant to the current project/directory
+- [ ] aliasman indexes aliases with local embeddings in LanceDB for semantic search
+- [ ] Claude can search aliases semantically through a local MCP server/tool
 - [ ] Console help for all commands, options, and arguments
 - [ ] Shell workflow hints surfaced where useful
 
