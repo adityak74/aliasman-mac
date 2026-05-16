@@ -97,35 +97,35 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| FND-01 | Phase 1 | Pending |
-| FND-02 | Phase 1 | Pending |
-| FND-03 | Phase 1 | Pending |
-| FND-04 | Phase 1 | Pending |
-| SHL-01 | Phase 2 | Pending |
-| SHL-02 | Phase 2 | Pending |
-| SHL-03 | Phase 2 | Pending |
-| SHL-04 | Phase 2 | Pending |
-| SHL-05 | Phase 2 | Pending |
-| ALS-01 | Phase 3 | Pending |
-| ALS-02 | Phase 3 | Pending |
-| ALS-03 | Phase 3 | Pending |
-| ALS-04 | Phase 3 | Pending |
-| ALS-05 | Phase 3 | Pending |
-| HST-01 | Phase 4 | Pending |
-| HST-02 | Phase 4 | Pending |
-| HST-03 | Phase 4 | Pending |
-| HST-04 | Phase 4 | Pending |
-| HST-05 | Phase 4 | Pending |
-| CLD-01 | Phase 5 | Pending |
-| CLD-02 | Phase 5 | Pending |
-| CLD-03 | Phase 5 | Pending |
-| CLD-04 | Phase 5 | Pending |
-| CLD-05 | Phase 5 | Pending |
-| SEM-01 | Phase 6 | Pending |
-| SEM-02 | Phase 6 | Pending |
-| SEM-03 | Phase 6 | Pending |
-| SEM-04 | Phase 6 | Pending |
-| SEM-05 | Phase 6 | Pending |
+| FND-01 | Phase 1 | Complete |
+| FND-02 | Phase 1 | Complete |
+| FND-03 | Phase 1 | Complete |
+| FND-04 | Phase 1 | Complete |
+| SHL-01 | Phase 2 | Complete |
+| SHL-02 | Phase 2 | Complete |
+| SHL-03 | Phase 2 | Complete |
+| SHL-04 | Phase 2 | Complete |
+| SHL-05 | Phase 2 | Complete |
+| ALS-01 | Phase 3 | Complete |
+| ALS-02 | Phase 3 | Complete |
+| ALS-03 | Phase 3 | Complete |
+| ALS-04 | Phase 3 | Complete |
+| ALS-05 | Phase 3 | Complete |
+| HST-01 | Phase 4 | Complete |
+| HST-02 | Phase 4 | Complete |
+| HST-03 | Phase 4 | Complete |
+| HST-04 | Phase 4 | Complete |
+| HST-05 | Phase 4 | Complete |
+| CLD-01 | Phase 5 | Complete |
+| CLD-02 | Phase 5 | Complete |
+| CLD-03 | Phase 5 | Complete |
+| CLD-04 | Phase 5 | Complete |
+| CLD-05 | Phase 5 | Complete |
+| SEM-01 | Phase 6 | Complete |
+| SEM-02 | Phase 6 | Complete |
+| SEM-03 | Phase 6 | Complete |
+| SEM-04 | Phase 6 | Complete |
+| SEM-05 | Phase 6 | Complete |
 
 **Coverage:**
 - v0.0.1 requirements: 29 total
@@ -134,4 +134,4 @@
 
 ---
 *Roadmap created: 2026-05-11*
-*Last updated: 2026-05-11 after adding Phase 6 semantic search*
+*Last updated: 2026-05-15 — all 6 phases verified, milestone v0.0.1 complete*

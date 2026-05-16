@@ -1,3 +1,9 @@
+pub mod history;
+pub mod hook;
+pub mod import;
+pub mod mcp;
 pub mod model;
+pub mod search;
+pub mod shell;
 pub mod store;
 pub mod validation;
