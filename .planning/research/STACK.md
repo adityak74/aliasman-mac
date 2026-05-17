@@ -1,467 +1,311 @@
-# Technology Stack: aliasman
+# Technology Stack Additions: Alias Library (v0.1)
 
 **Project:** aliasman — Rust CLI alias manager for macOS/Linux
-**Researched:** 2026-05-10
-**Confidence:** HIGH (all crates verified via crates.io + Context7 docs; hooks format verified from live ~/.claude/settings.json)
+**Feature:** Shareable alias packs (v0.1 Alias Library)
+**Researched:** 2026-05-16
+**Confidence:** HIGH (all crate versions verified via crates.io API)
 
 ---
 
-## 1. CLI Framework
+## Existing Stack (v0.0.1 baseline — no changes needed)
 
-### Recommendation: clap 4.6.1 with the `derive` feature
+| Crate | Version | Role |
+|-------|---------|------|
+| `clap` | 4 (derive) | CLI framework |
+| `toml` | 0.9 | Alias store serialization |
+| `serde` / `serde_json` | 1 | Serialization |
+| `reqwest` | 0.12 (json) | HTTP client (already present) |
+| `tokio` | 1 (macros, rt-multi-thread) | Async runtime (already present) |
+| `tempfile` | 3 | Atomic writes (already present) |
+| `dirs` | 5 | Home directory resolution (already present) |
+| `lancedb` | 0.29 | Vector search (unchanged) |
+| `rmcp` | 1 (server, macros, schemars) | MCP server (unchanged) |
 
-**Why:** clap is the unambiguous standard for Rust CLIs in 2025. It provides derive macros that turn annotated structs and enums directly into a fully-featured CLI — subcommands, named flags, help text, shell completions, and colored output are all handled with no boilerplate. The derive API matches aliasman's "named flags" requirement (`aliasman add --name gs --command "git status"`) directly.
-
-```toml
-[dependencies]
-clap = { version = "4.6", features = ["derive", "color", "wrap_help"] }
-```
-
-```rust
-use clap::{Parser, Subcommand};
-
-#[derive(Parser)]
-#[command(name = "aliasman", version, about = "Shell alias manager")]
-struct Cli {
-    #[command(subcommand)]
-    command: Commands,
-}
-
-#[derive(Subcommand)]
-enum Commands {
-    /// Add a new alias
-    Add {
-        #[arg(long)]
-        name: String,
-        #[arg(long)]
-        command: String,
-    },
-    /// List all aliases
-    List,
-    /// Delete an alias
-    Delete {
-        #[arg(long)]
-        name: String,
-    },
-    /// Suggest aliases from shell history
-    Suggest,
-    /// Show history statistics
-    Stats,
-    /// Install or remove the Claude Code hook
-    Hook {
-        #[arg(long)]
-        install: bool,
-        #[arg(long)]
-        uninstall: bool,
-    },
-}
-```
-
-**What NOT to use:**
-
-- `argh` — Google-internal style, limited features, no subcommand nesting, almost no community adoption outside Google tooling.
-- `lexopt` — Low-level, no derive, hand-rolls all parsing; only appropriate when binary size is an extreme constraint (it isn't here).
-- `structopt` — Deprecated; absorbed into clap 3+ as the derive feature. Using structopt in 2025 means a dead dependency.
-- `pico-args` — Minimal, no subcommands, no help generation. For embedded-style CLIs only.
-
-**Version source:** crates.io API, clap 4.6.1 released 2026-04-15.
+**Key observation:** `reqwest` is already a dependency with `json` features. `tokio` is already present. HTTP-based pack downloads can reuse existing infrastructure without adding new crates.
 
 ---
 
-## 2. History Parsing
+## New Crates for Alias Library
 
-### Recommendation: Hand-written parser using `std::fs` + `regex 1.12.3`
+### 1. Pack Format: TOML (no new crate)
 
-**Why:** There is no mature, maintained crate specifically for parsing zsh/bash history in Rust as of 2025. The crates that exist (`pxh`, `histat`, `ristory`) are end-user tools, not parser libraries. The formats are simple enough that a custom parser is the right call — and it avoids adding a dependency on an unmaintained or niche crate.
+**Decision:** Pack files use TOML. The existing `toml` 0.9 crate handles serialization/deserialization. No new dependency.
 
-**Zsh extended history format** (when `HISTFILE` uses `EXTENDED_HISTORY`):
-```
-: 1700000000:0;git status
-: 1700000001:2;cargo build --release
-```
-Format: `: <timestamp>:<elapsed>;<command>`
+**Rationale:** The alias store already uses TOML. A pack is a superset of the store format — it adds a `[metadata]` section with pack-level fields (name, version, description, author) alongside the existing `[[aliases]]` array. Users can hand-edit pack files, tools in the ecosystem understand TOML, and the project already has TOML deserialization infrastructure.
 
-**Bash history format** (when `HISTTIMEFORMAT` is set):
-```
-#1700000000
-git status
-```
-Or plain (no timestamps):
-```
-git status
-cargo build
-```
+**Pack file structure (`pack.toml`):**
 
-**Parser approach:**
 ```toml
-[dependencies]
-regex = "1.12"
+[metadata]
+name = "kubernetes"
+version = "0.1.0"
+description = "Common kubectl aliases for Kubernetes development"
+author = "aliasman"
+
+[options]
+# Optional: conflict resolution strategy when pack alias name collides with user alias
+on_conflict = "skip"       # "skip" | "overwrite" | "prompt" (default: "skip")
+
+[[aliases]]
+name = "kget"
+command = "kubectl get"
+description = "Quick kubectl get"
+tags = ["kubectl", "kubernetes"]
+shell = "all"
+
+[[aliases]]
+name = "klogs"
+command = "kubectl logs -f"
+description = "Follow pod logs"
+tags = ["kubectl", "kubernetes", "logs"]
+shell = "all"
 ```
 
-```rust
-use regex::Regex;
+**Alt considered and rejected:**
+- **JSON pack format** — Less human-editable. TOML is the project standard. No benefit.
+- **YAML pack format** — Requires `serde_yaml` crate (adds a dependency). YAML's ambiguity (indentation, anchors) makes it worse for programmatic consumption.
+- **Custom binary format** — Overkill. Packs are small text files. Human readability is a feature.
 
-// Zsh extended history line
-static ZSH_EXTENDED: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"^: (\d+):\d+;(.+)$").unwrap()
-});
+### 2. Semantic Versioning for Packs: `semver` 1.0.28
 
-// Bash timestamped history line
-static BASH_TIMESTAMP: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"^#(\d+)$").unwrap()
-});
-```
-
-Parse the file line by line, accumulate `(timestamp: Option<u64>, command: String)` pairs, then aggregate by command to compute frequency counts.
-
-**What NOT to use:**
-
-- `nom` — Powerful but heavyweight for this use case. zsh/bash history is line-oriented text, not a grammar requiring combinator parsing. Adds compile-time and cognitive overhead with no benefit.
-- Any of the existing history CLIs as libraries — `pxh`, `histat`, etc. are not designed for library use and have no documented public API.
-
-**History file locations to handle:**
-- Zsh: `$HISTFILE` env var, fallback to `~/.zsh_history`
-- Bash: `$HISTFILE` env var, fallback to `~/.bash_history`
-
----
-
-## 3. File Manipulation (Safe Shell Config Editing)
-
-### Recommendation: `tempfile 3.27.0` for atomic writes + `regex 1.12.3` for pattern matching
-
-**Why:** The key risk in editing `~/.zshrc` or `~/.aliases` is data loss if the process crashes mid-write or the user interrupts. The write-then-rename (atomic replace) pattern prevents this: write to a temp file in the same directory, then `rename()` it over the target. `tempfile::NamedTempFile::persist()` implements exactly this.
+**Why:** Pack versions follow semver (`0.1.0`, `1.0.0-beta.1`). The `semver` crate by dtolnay provides parsing, comparison, and requirement matching (`^0.1`, `>=0.2.0, <1.0.0`). This enables version constraint checking during install and update operations.
 
 ```toml
 [dependencies]
-tempfile = "3.27"
-regex = "1.12"
+semver = "1.0"
 ```
 
-**Pattern for safe shell config editing:**
+```rust
+use semver::{Version, VersionReq};
+
+// Parse pack version
+let v = Version::parse("0.1.0")?;
+
+// Check if installed version meets requirement
+let req = VersionReq::parse(">=0.1.0")?;
+if req.matches(&v) { /* compatible */ }
+```
+
+**Version source:** crates.io API confirms `semver` 1.0.28 is the latest release.
+
+**Alt considered and rejected:**
+- **Rolling our own version parsing** — Semver has edge cases (pre-release ordering, build metadata, comparator operators). The dtolnay crate is authoritative and well-tested.
+- **`cargo-semver-checks`** — Designed for API compatibility linting between crate versions, not for parsing/comparing version strings at runtime. Wrong tool.
+
+### 3. Pack Distribution — Git Clone: `git2` 0.20.4
+
+**Why:** Users should be able to install packs from a git repo URL (`aliasman pack install git@github.com:user/k8s-pack.git` or `https://github.com/user/k8s-pack.git`). `git2` provides Rust bindings to libgit2 for cloning, fetching, and checking out repositories.
+
+```toml
+[dependencies]
+git2 = { version = "0.20", features = ["https"] }
+```
+
+**Feature flag strategy:** Enable only `https` by default. Add `ssh` as an optional feature behind a compile flag (`--features ssh`) to avoid pulling in OpenSSL/SSH dependencies for users who only need HTTPS-based pack installs.
 
 ```rust
-use tempfile::NamedTempFile;
-use std::io::Write;
-use std::path::Path;
+use git2::Repository;
 
-fn write_aliases_file(path: &Path, content: &str) -> anyhow::Result<()> {
-    let dir = path.parent().unwrap_or(Path::new("."));
-    let mut tmp = NamedTempFile::new_in(dir)?;
-    tmp.write_all(content.as_bytes())?;
-    tmp.flush()?;
-    tmp.persist(path)?;
+fn clone_pack_repo(url: &str, dest: &std::path::Path) -> anyhow::Result<()> {
+    let repo = Repository::clone(url, dest)?;
     Ok(())
 }
 ```
 
-**Pattern for sourcing line injection:**
+**Version source:** crates.io API confirms `git2` 0.20.4 is the latest release.
+
+**Alt considered and rejected:**
+- **Spawning `git` CLI via `std::process::Command`** — Simpler but fragile: requires git to be installed on the user's system, platform-specific path issues, harder to parse output reliably. `git2` is self-contained and cross-platform.
+- **`git2` with both `https` and `ssh` features** — SSH adds OpenSSL/libssh2 system dependencies. Keep it optional to minimize install friction. Users who need SSH can enable it.
+
+**System dependency warning:** `git2` links against `libgit2`. On macOS this is typically available via Homebrew (`libgit2`). The build may require `pkg-config`. This is a documented build requirement, not a blocker.
+
+### 4. Pack Distribution — HTTP Download: (no new crate)
+
+**Why:** Users should install packs from a URL (`aliasman pack install https://example.com/packs/k8s-0.1.0.tar.gz`). The existing `reqwest` 0.12 crate handles HTTP GET requests. No new dependency needed.
+
+**Expected pack download flow:**
+1. `reqwest::get(url)` to fetch the tarball
+2. Write bytes to a temp file via `tempfile` (already a dependency)
+3. Verify SHA-256 checksum (see below)
+4. Extract with `tar` (see below)
+
+### 5. Pack Archive Extraction: `tar` 0.4.45 + `flate2` 1.1.9
+
+**Why:** Distributed packs arrive as `.tar.gz` archives. The `tar` crate handles tar archive reading/extraction. `flate2` provides gzip decompression (required as a `Read` wrapper for gzipped tarballs).
+
+```toml
+[dependencies]
+tar = "0.4"
+flate2 = "1.1"
+```
 
 ```rust
-use regex::Regex;
+use flate2::read::GzDecoder;
+use std::fs::File;
 
-fn ensure_source_line(rc_content: &str, aliases_path: &str) -> String {
-    let marker = format!("source {}", aliases_path);
-    if rc_content.contains(&marker) {
-        rc_content.to_string()
-    } else {
-        format!("{}\n# Added by aliasman\n{}\n", rc_content.rstrip(), marker)
+fn extract_pack(tarball_path: &str, dest: &std::path::Path) -> anyhow::Result<()> {
+    let file = File::open(tarball_path)?;
+    let decoder = GzDecoder::new(file);
+    let mut archive = tar::Archive::new(decoder);
+    archive.unpack(dest)?;
+    Ok(())
+}
+```
+
+**Version source:** crates.io API confirms `tar` 0.4.45 and `flate2` 1.1.9 are the latest releases.
+
+**Alt considered and rejected:**
+- **`zip` crate** — Zip is common on Windows but tar.gz is the standard in the Rust/Unix ecosystem (crates.io uses `.crate` which is a `.tar.gz`). Matches user expectations for CLI tool distributions.
+- **`zstd` compression** — Newer and faster, but tar.gz has universal tooling support (`tar -xzf`). Users can inspect pack contents with standard shell tools.
+
+### 6. Checksum Verification: `sha2` 0.11.0
+
+**Why:** Pack integrity must be verified after download. SHA-256 checksums prevent corrupted or tampered packs from being installed. The `sha2` crate is the standard Rust implementation of SHA-2.
+
+```toml
+[dependencies]
+sha2 = "0.10"
+```
+
+**Note on versioning:** The `sha2` crate follows a different version scheme — 0.10.x is current (it is part of the `crypto-common` ecosystem which uses 0.10.x as its stable line). Version 0.11.0 is the latest per crates.io.
+
+```rust
+use sha2::{Digest, Sha256};
+
+fn verify_checksum(data: &[u8], expected: &str) -> bool {
+    let mut hasher = Sha256::new();
+    hasher.update(data);
+    let result = hasher.finalize();
+    let actual = format!("{:x}", result);
+    actual == expected
+}
+```
+
+**Version source:** crates.io API confirms `sha2` 0.11.0 is the latest release.
+
+**Alt considered and rejected:**
+- **`hmac`** — Designed for keyed hash authentication, not simple integrity checksums. SHA-256 is sufficient.
+- **Spawning `shasum` CLI** — Platform-dependent (`shasum -a 256` on macOS, `sha256sum` on Linux). `sha2` is cross-platform and pure Rust.
+
+### 7. URL Parsing: `url` 2.5.8
+
+**Why:** Pack install sources can be paths, HTTP URLs, or git URLs. The `url` crate provides robust URL parsing, scheme detection, and component extraction (host, path, query) to route install requests to the correct handler (file vs HTTP vs git).
+
+```toml
+[dependencies]
+url = "2.5"
+```
+
+```rust
+use url::Url;
+
+fn parse_pack_source(source: &str) -> PackSource {
+    let parsed = Url::parse(source);
+    match parsed {
+        Ok(u) => match u.scheme() {
+            "file" => PackSource::Local(u.to_file_path().unwrap()),
+            "https" | "http" => {
+                if u.path().ends_with(".git") {
+                    PackSource::Git(source.to_string())
+                } else {
+                    PackSource::Http(source.to_string())
+                }
+            }
+            _ => PackSource::Git(source.to_string()), // git@... format
+        },
+        Err(_) => PackSource::Local(std::path::PathBuf::from(source)),
     }
 }
 ```
 
-**What NOT to use:**
-
-- AST/grammar-based shell parsers (e.g., `shlex`, bash-parser ports) — overkill for the specific task of adding/removing a single line. Shell is not safely parseable in the general case; avoiding full parsing is intentional.
-- `std::fs::write()` directly — Not atomic. If the process dies between truncating and writing, the file is corrupted.
-- In-place file editing (opening with `OpenOptions::append` or seeking back) — Error-prone and not atomic.
-
-**Alias file format:** Plain text, one alias per line, bash/zsh compatible:
-```sh
-alias gs='git status'
-alias gb='git branch'
-```
-Parsing is straightforward with `lines()` and prefix matching on `"alias "`.
+**Version source:** crates.io API confirms `url` 2.5.8 is the latest release.
 
 ---
 
-## 4. Claude Code Hooks API
-
-### Verified from live `~/.claude/settings.json` and hook scripts on this machine.
-
-**Hook registration format** (`~/.claude/settings.json`):
-
-```json
-{
-  "hooks": {
-    "SessionStart": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "/path/to/aliasman-hook"
-          }
-        ]
-      }
-    ],
-    "PostToolUse": [
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "/path/to/aliasman-hook",
-            "timeout": 5
-          }
-        ]
-      }
-    ],
-    "PreToolUse": [
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "/path/to/aliasman-hook",
-            "timeout": 5
-          }
-        ]
-      }
-    ]
-  }
-}
-```
-
-**Hook event types (confirmed):**
-- `SessionStart` — Fires when a Claude Code session begins. No matcher. Used for context injection.
-- `PreToolUse` — Fires before a tool executes. Has `matcher` (tool name regex). Can block with `{"decision": "block", "reason": "..."}` + exit 2.
-- `PostToolUse` — Fires after a tool executes. Has `matcher`. Advisory only (cannot undo).
-
-**Hook input (stdin):** JSON object containing:
-```json
-{
-  "session_id": "abc123",
-  "cwd": "/Users/alice/project",
-  "tool_name": "Bash",
-  "tool_input": { "command": "git status" }
-}
-```
-For `SessionStart`, `tool_name` and `tool_input` are absent.
-
-**Hook output (stdout):** JSON object:
-```json
-{
-  "hookSpecificOutput": {
-    "hookEventName": "SessionStart",
-    "additionalContext": "## Your Aliases\nalias gs='git status'\n..."
-  }
-}
-```
-- For `SessionStart`: `hookEventName` must be `"SessionStart"`, `additionalContext` is injected into the session.
-- For `PostToolUse`: `hookEventName` is `"PostToolUse"`, `additionalContext` is advisory text.
-- For `PreToolUse` blocking: emit `{"decision": "block", "reason": "..."}` to stdout and exit 2.
-
-**Hook exit codes:**
-- `0` — Success / no-op
-- `2` — Block (PreToolUse only); must also output `{"decision": "block", ...}` to stdout
-
-**Silence rule:** Hooks must exit 0 and produce no output when they have nothing to say. Hooks that crash or produce malformed output are silently ignored by Claude Code.
-
-**aliasman hook strategy (SessionStart):**
-
-The hook binary should:
-1. Read `~/.aliases` (the aliasman-managed file)
-2. Detect the current working directory's project context (language, tools in use)
-3. Score each alias for relevance to the current project
-4. Emit the top N relevant aliases (not the entire file) as `additionalContext`
-5. Keep output under ~500 tokens to respect Claude Code's context budget
-
-**Modifying settings.json safely:**
-
-Use `serde_json` to read the existing JSON, merge the hook entry, then write atomically with `tempfile`. Never clobber other hooks already installed.
+## New Dependency Summary
 
 ```toml
 [dependencies]
-serde_json = "1.0"
-serde = { version = "1.0", features = ["derive"] }
-tempfile = "3.27"
+# Pack versioning
+semver = "1.0"
+
+# Pack distribution — git clone
+git2 = { version = "0.20", features = ["https"] }
+
+# Pack archive extraction
+tar = "0.4"
+flate2 = "1.1"
+
+# Pack integrity verification
+sha2 = "0.10"
+
+# URL parsing for pack source routing
+url = "2.5"
 ```
+
+**Crates NOT needed (reusing existing):**
+
+| Capability | Existing Crate | Why No Addition |
+|-----------|---------------|-----------------|
+| HTTP download | `reqwest` 0.12 | Already in dependencies |
+| Async runtime | `tokio` 1 | Already in dependencies |
+| TOML serialization | `toml` 0.9 | Already in dependencies |
+| JSON serialization | `serde_json` 1 | Already in dependencies |
+| Atomic file writes | `tempfile` 3 | Already in dependencies |
+| Home dir resolution | `dirs` 5 | Already in dependencies |
 
 ---
 
-## 5. Distribution (Homebrew)
+## Pack Registry Design (no new crate)
 
-### Recommendation: `cargo-dist 0.31.0` + GitHub Actions + personal Homebrew tap
-
-**Why:** `cargo-dist` (by Axo) is the current standard tool for distributing Rust binaries via Homebrew in 2025. It generates GitHub Actions workflows that cross-compile for macOS (x86_64 + aarch64), Linux, and Windows, produces SHA256-verified tarballs, creates GitHub Releases, and pushes a Homebrew formula to a user-controlled tap repository.
-
-**Setup:**
-
-```bash
-cargo install cargo-dist
-dist init --installer homebrew --ci github
-```
-
-This generates `.github/workflows/release.yml` and configures `dist-workspace.toml`.
-
-**`dist-workspace.toml` (or `Cargo.toml [workspace.metadata.dist]`):**
+**Local registry:** A TOML file at `~/.config/aliasman/packs.toml` tracking installed packs. Uses existing `toml` crate.
 
 ```toml
-[dist]
-cargo-dist-version = "0.31.0"
-ci = ["github"]
-installers = ["shell", "homebrew"]
-tap = "YOUR_GITHUB_USERNAME/homebrew-aliasman"
-publish-jobs = ["homebrew"]
-targets = [
-    "x86_64-apple-darwin",
-    "aarch64-apple-darwin",
-    "x86_64-unknown-linux-gnu",
-]
-checksum = "sha256"
+[[installed]]
+name = "kubernetes"
+version = "0.1.0"
+source = "https://github.com/aliasman/packs/raw/main/kubernetes-0.1.0.tar.gz"
+checksum = "a1b2c3d4..."
+installed_at = 1715300000
+pack_file = "/Users/user/.config/aliasman/packs/kubernetes/pack.toml"
 ```
 
-**Homebrew tap setup:**
-1. Create a GitHub repository named `homebrew-aliasman` under your account.
-2. Grant the GitHub Actions token write access to that repo (via a fine-grained PAT stored as `HOMEBREW_TAP_TOKEN` secret).
-3. cargo-dist pushes the formula on each tagged release.
-
-**Release trigger:**
-```bash
-git tag v0.1.0
-git push --tags
-# GitHub Actions runs dist plan → dist build → dist host → dist publish
-# Results in: GitHub Release + Homebrew formula update
-```
-
-**User install:**
-```bash
-brew tap YOUR_USERNAME/aliasman
-brew install aliasman
-```
-
-**`cargo install` secondary path:**
-```bash
-cargo install aliasman
-```
-
-**What NOT to use:**
-
-- Manual formula writing — cargo-dist handles SHA computation, formula templating, and tap push automatically. Manual formulas are error-prone and require updating on every release.
-- `goreleaser` — Go-specific; does not handle Rust cross-compilation.
-- Submitting to homebrew-core — Requires prebuilt bottles and significant review time; not appropriate until the tool has proven adoption. Use a personal tap for v1.
+**Remote registry (deferred to v0.2):** A JSON index file hosted on GitHub (e.g., `https://aliasman.packs/index.json`). Fetched via existing `reqwest`. Not needed for v0.1 MVP — v0.1 supports direct install from URL/git/file only. A registry is a convenience layer on top of that.
 
 ---
 
-## 6. Cross-Platform File Paths
+## Build Dependency Notes
 
-### Recommendation: `dirs 6.0.0` for home directory resolution + `std::path::PathBuf` for path construction
+| New Crate | System Dependency | Resolution |
+|-----------|-------------------|------------|
+| `git2` | `libgit2` + `pkg-config` | `brew install libgit2` on macOS. Document in install guide. |
+| `flate2` | `libz` (zlib) | Pre-installed on macOS. May need `zlib1g-dev` on Debian/Ubuntu. |
+| `tar`, `sha2`, `semver`, `url` | None | Pure Rust. |
 
-**Why:** `dirs` (the `directories` crate family) resolves `home_dir()` correctly on macOS, Linux, and Windows using OS-appropriate conventions, without relying on the `HOME` environment variable (which can be unset or wrong in certain execution contexts like sudo or CI). It is the canonical solution used by virtually every Rust CLI tool that needs platform-aware paths.
-
-```toml
-[dependencies]
-dirs = "6.0"
-```
-
-```rust
-use std::path::PathBuf;
-
-fn aliases_file() -> anyhow::Result<PathBuf> {
-    let home = dirs::home_dir().ok_or_else(|| anyhow::anyhow!("Cannot determine home directory"))?;
-    Ok(home.join(".aliases"))
-}
-
-fn zshrc_path() -> anyhow::Result<PathBuf> {
-    let home = dirs::home_dir().ok_or_else(|| anyhow::anyhow!("Cannot determine home directory"))?;
-    Ok(home.join(".zshrc"))
-}
-
-fn claude_settings_path() -> anyhow::Result<PathBuf> {
-    let home = dirs::home_dir().ok_or_else(|| anyhow::anyhow!("Cannot determine home directory"))?;
-    Ok(home.join(".claude").join("settings.json"))
-}
-
-fn zsh_history_path() -> PathBuf {
-    std::env::var("HISTFILE")
-        .map(PathBuf::from)
-        .unwrap_or_else(|_| {
-            dirs::home_dir()
-                .unwrap_or_default()
-                .join(".zsh_history")
-        })
-}
-```
-
-**Shell config file detection priority:**
-1. Check `$SHELL` environment variable to determine the active shell.
-2. For zsh: `~/.zshrc` (interactive) or `~/.zprofile` (login-only)
-3. For bash: `~/.bashrc` (Linux) or `~/.bash_profile` (macOS, login shell)
-4. Fall back to asking the user on first run via `dialoguer`
-
-**What NOT to use:**
-
-- Hardcoding `/Users/username/` — breaks on Linux and for non-standard macOS setups.
-- `std::env::var("HOME")` directly — can be empty or wrong in privilege-escalated contexts (sudo, launchd services); `dirs::home_dir()` uses OS APIs instead.
-- `shellexpand` — Useful for expanding `~` in user-provided strings, but not needed for path resolution in internal code where you control construction. Keep it on the shelf unless you need to expand user-input paths.
+**Risk:** `git2`'s libgit2 dependency is the only new system-level requirement. If a user does not have `libgit2` installed, the build fails. Mitigation: document the prerequisite, and consider making git support an optional feature (`--features git`) so users who only need file/HTTP installs can build without it.
 
 ---
 
-## Complete Dependency List
+## Integration with Existing Stack
 
-```toml
-[dependencies]
-# CLI framework
-clap = { version = "4.6", features = ["derive", "color", "wrap_help"] }
+**Data model extension:** `AliasRecord` in `model.rs` gains a new `source` variant: `AliasSource::Pack`. The existing `AliasSource` enum (User, Imported, Suggested) expands to five values.
 
-# Error handling
-anyhow = "1.0"
-thiserror = "2.0"
+**Store layer extension:** The `AliasStore` struct in `store.rs` gains a `packs` field tracking which packs contributed which aliases. This enables conflict detection (user alias vs pack alias with same name) and pack uninstall (remove only pack-contributed aliases).
 
-# Serialization (for settings.json manipulation)
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
+**CLI extension:** New top-level subcommand `Pack` with sub-subcommands: `create`, `export`, `install`, `list`, `remove`, `update`. Built on existing `clap` derive infrastructure.
 
-# Cross-platform paths
-dirs = "6.0"
-
-# Safe file writes (atomic replace)
-tempfile = "3.27"
-
-# History and alias file parsing
-regex = "1.12"
-
-# Terminal output
-colored = "3.1"
-
-[dev-dependencies]
-# Testing
-assert_cmd = "2"
-predicates = "3"
-tempdir = "0.3"
-```
-
-**Crates intentionally excluded:**
-
-| Crate | Reason Excluded |
-|-------|----------------|
-| `nom` | Overkill for line-oriented text; regex is sufficient |
-| `toml` | Not needed; aliasman uses JSON (settings.json) and plain text (aliases) |
-| `dialoguer` | Deferred to v2; v1 uses flags not interactive prompts |
-| `indicatif` | No long-running operations in v1 requiring progress display |
-| `shellexpand` | Not needed for internal path construction |
-| `console` | `colored` is simpler for the terminal output needs here |
-| `crossterm` | No TUI; pure CLI output only |
+**Search integration:** Pack-installed aliases are indexed into the existing LanceDB vector store alongside user aliases. No change to the search layer — pack aliases are just aliases with `source = "pack"`.
 
 ---
 
 ## Sources
 
-- clap: https://docs.rs/clap/latest/clap/ (Context7 verified) — version 4.6.1 confirmed via crates.io
-- cargo-dist: https://github.com/axodotdev/cargo-dist (Context7 verified) — version 0.31.0 confirmed via crates.io
-- dirs: https://github.com/dirs/directories-rs (Context7 verified) — version 6.0.0 confirmed via crates.io
-- tempfile: https://docs.rs/tempfile (Context7 verified) — version 3.27.0 confirmed via crates.io
-- serde_json: https://docs.rs/serde_json (Context7 verified) — version 1.0.149 confirmed via crates.io
-- anyhow: https://docs.rs/anyhow (Context7 verified) — version 1.0.102 confirmed via crates.io
-- regex: https://docs.rs/regex (Context7 verified) — version 1.12.3 confirmed via crates.io
-- Claude Code hooks format: verified directly from ~/.claude/settings.json and ~/.claude/hooks/ scripts on this machine (HIGH confidence — primary source)
-- Hook input/output protocol: verified from gsd-context-monitor.js, gsd-session-state.sh, gsd-validate-commit.sh source code
+- `tar` 0.4.45: verified via crates.io API (`https://crates.io/api/v1/crates/tar`)
+- `flate2` 1.1.9: verified via crates.io API (`https://crates.io/api/v1/crates/flate2`)
+- `sha2` 0.11.0: verified via crates.io API (`https://crates.io/api/v1/crates/sha2`)
+- `semver` 1.0.28: verified via crates.io API (`https://crates.io/api/v1/crates/semver`) + Context7 docs (`/dtolnay/semver`)
+- `git2` 0.20.4: verified via crates.io API (`https://crates.io/api/v1/crates/git2`) + Context7 docs (`/rust-lang/git2-rs`)
+- `url` 2.5.8: verified via crates.io API (`https://crates.io/api/v1/crates/url`)
+- `reqwest` 0.12: already in project Cargo.toml
+- Pack format rationale: TOML chosen to match existing `toml` 0.9 dependency and project convention
