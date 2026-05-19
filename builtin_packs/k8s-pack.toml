@@ -1,0 +1,248 @@
+[manifest]
+name = "k8s"
+version = "1.0.0"
+description = "Kubernetes (kubectl) aliases for common operations"
+author = "aliasman"
+format_version = "0.1"
+
+[[aliases]]
+name = "k"
+command = "kubectl"
+tags = ["k8s", "core"]
+shell = "all"
+created_at = 1779200000
+updated_at = 1779200000
+
+[aliases.source]
+pack = "k8s"
+
+[[aliases]]
+name = "kget"
+command = "kubectl get"
+tags = ["k8s", "get"]
+shell = "all"
+created_at = 1779200000
+updated_at = 1779200000
+
+[aliases.source]
+pack = "k8s"
+
+[[aliases]]
+name = "kpods"
+command = "kubectl get pods"
+tags = ["k8s", "pods"]
+shell = "all"
+created_at = 1779200000
+updated_at = 1779200000
+
+[aliases.source]
+pack = "k8s"
+
+[[aliases]]
+name = "kdpods"
+command = "kubectl get pods --all-namespaces"
+tags = ["k8s", "pods", "debug"]
+shell = "all"
+created_at = 1779200000
+updated_at = 1779200000
+
+[aliases.source]
+pack = "k8s"
+
+[[aliases]]
+name = "kscale"
+command = "kubectl scale"
+tags = ["k8s", "scale"]
+shell = "all"
+created_at = 1779200000
+updated_at = 1779200000
+
+[aliases.source]
+pack = "k8s"
+
+[[aliases]]
+name = "klogs"
+command = "kubectl logs -f"
+tags = ["k8s", "logs"]
+shell = "all"
+created_at = 1779200000
+updated_at = 1779200000
+
+[aliases.source]
+pack = "k8s"
+
+[[aliases]]
+name = "kexec"
+command = "kubectl exec -it"
+tags = ["k8s", "exec"]
+shell = "all"
+created_at = 1779200000
+updated_at = 1779200000
+
+[aliases.source]
+pack = "k8s"
+
+[[aliases]]
+name = "kdescribe"
+command = "kubectl describe"
+tags = ["k8s", "describe"]
+shell = "all"
+created_at = 1779200000
+updated_at = 1779200000
+
+[aliases.source]
+pack = "k8s"
+
+[[aliases]]
+name = "kdelete"
+command = "kubectl delete"
+tags = ["k8s", "delete"]
+shell = "all"
+created_at = 1779200000
+updated_at = 1779200000
+
+[aliases.source]
+pack = "k8s"
+
+[[aliases]]
+name = "kapply"
+command = "kubectl apply -f"
+tags = ["k8s", "apply"]
+shell = "all"
+created_at = 1779200000
+updated_at = 1779200000
+
+[aliases.source]
+pack = "k8s"
+
+[[aliases]]
+name = "kgetsvc"
+command = "kubectl get services"
+tags = ["k8s", "services"]
+shell = "all"
+created_at = 1779200000
+updated_at = 1779200000
+
+[aliases.source]
+pack = "k8s"
+
+[[aliases]]
+name = "kgetdeploy"
+command = "kubectl get deployments"
+tags = ["k8s", "deployments"]
+shell = "all"
+created_at = 1779200000
+updated_at = 1779200000
+
+[aliases.source]
+pack = "k8s"
+
+[[aliases]]
+name = "kgetpvc"
+command = "kubectl get pvc"
+tags = ["k8s", "pvc", "storage"]
+shell = "all"
+created_at = 1779200000
+updated_at = 1779200000
+
+[aliases.source]
+pack = "k8s"
+
+[[aliases]]
+name = "kgetingress"
+command = "kubectl get ingress"
+tags = ["k8s", "ingress"]
+shell = "all"
+created_at = 1779200000
+updated_at = 1779200000
+
+[aliases.source]
+pack = "k8s"
+
+[[aliases]]
+name = "krollout"
+command = "kubectl rollout status deployment/"
+tags = ["k8s", "rollout"]
+shell = "all"
+created_at = 1779200000
+updated_at = 1779200000
+
+[aliases.source]
+pack = "k8s"
+
+[[aliases]]
+name = "kportforward"
+command = "kubectl port-forward"
+tags = ["k8s", "port-forward"]
+shell = "all"
+created_at = 1779200000
+updated_at = 1779200000
+
+[aliases.source]
+pack = "k8s"
+
+[[aliases]]
+name = "kconfig"
+command = "kubectl config"
+tags = ["k8s", "config"]
+shell = "all"
+created_at = 1779200000
+updated_at = 1779200000
+
+[aliases.source]
+pack = "k8s"
+
+[[aliases]]
+name = "knodes"
+command = "kubectl get nodes"
+tags = ["k8s", "nodes"]
+shell = "all"
+created_at = 1779200000
+updated_at = 1779200000
+
+[aliases.source]
+pack = "k8s"
+
+[[aliases]]
+name = "kevents"
+command = "kubectl get events --sort-by=.metadata.creationTimestamp"
+tags = ["k8s", "events"]
+shell = "all"
+created_at = 1779200000
+updated_at = 1779200000
+
+[aliases.source]
+pack = "k8s"
+
+[[aliases]]
+name = "kgetns"
+command = "kubectl get namespaces"
+tags = ["k8s", "namespaces"]
+shell = "all"
+created_at = 1779200000
+updated_at = 1779200000
+
+[aliases.source]
+pack = "k8s"
+
+[[aliases]]
+name = "kctx"
+command = "kubectl config current-context"
+tags = ["k8s", "context"]
+shell = "all"
+created_at = 1779200000
+updated_at = 1779200000
+
+[aliases.source]
+pack = "k8s"
+
+[[aliases]]
+name = "kuse"
+command = "kubectl config use-context"
+tags = ["k8s", "context"]
+shell = "all"
+created_at = 1779200000
+updated_at = 1779200000
+
+[aliases.source]
+pack = "k8s"

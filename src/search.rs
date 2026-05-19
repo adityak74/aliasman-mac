@@ -1,6 +1,6 @@
-use arrow_array::{Float32Array, RecordBatch, FixedSizeListArray};
+use arrow_array::{Array, Float32Array, RecordBatch, FixedSizeListArray};
 use arrow_schema::{DataType, Field, Schema};
-use lancedb::{error::Error as LanceError, DistanceType, Db};
+use lancedb::{error::Error as LanceError, Connection, DistanceType, query::{QueryBase, ExecutableQuery}};
 use std::sync::Arc;
 use thiserror::Error;
 
@@ -9,28 +9,28 @@ use crate::store::AliasStore;
 
 #[derive(Debug, Error)]
 pub enum SearchError {
-    #[error("Embedding failed: {0}")]
+     #[error("Embedding failed: {0}")]
     Embedding(#[from] EmbedError),
 
-    #[error("LanceDB error: {0}")]
+     #[error("LanceDB error: {0}")]
     Lance(#[from] LanceError),
 
-    #[error("IO error: {0}")]
+     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
 
-    #[error("Schema error: {0}")]
+     #[error("Schema error: {0}")]
     Schema(String),
 }
 
 #[derive(Debug, Error)]
 pub enum EmbedError {
-    #[error("HTTP request failed: {0}")]
+     #[error("HTTP request failed: {0}")]
     Http(#[from] reqwest::Error),
 
-    #[error("No Ollama response")]
+     #[error("No Ollama response")]
     NoResponse,
 
-    #[error("Ollama not available: {0}")]
+     #[error("Ollama not available: {0}")]
     NotAvailable(String),
 }
 
@@ -60,58 +60,58 @@ impl OllamaEmbeddingProvider {
             model: model.into(),
             dimensions,
             client: reqwest::Client::new(),
-        }
-    }
+         }
+     }
 
     pub fn default() -> Self {
         Self::new(DEFAULT_OLLAMA_URL, DEFAULT_EMBEDDING_MODEL, 768)
-    }
+     }
 
     async fn embed_async(&self, input: &str) -> Result<Vec<f32>, EmbedError> {
         let url = format!("{}/api/embed", self.base_url);
         let payload = serde_json::json!({
-            "model": self.model,
-            "input": input,
-        });
+             "model": self.model,
+             "input": input,
+         });
 
         let resp = self.client.post(&url).json(&payload).send().await?;
         if !resp.status().is_success() {
             return Err(EmbedError::NotAvailable(format!("Ollama returned {}", resp.status())));
-        }
+         }
 
         let body: serde_json::Value = resp.json().await?;
         let embeddings = body
-            .get("embeddings")
-            .ok_or(EmbedError::NoResponse)?
-            .as_array()
-            .ok_or(EmbedError::NoResponse)?;
+             .get("embeddings")
+             .ok_or(EmbedError::NoResponse)?
+             .as_array()
+             .ok_or(EmbedError::NoResponse)?;
 
         let mut result = Vec::with_capacity(self.dimensions);
         if let Some(first) = embeddings.get(0) {
             if let Some(arr) = first.as_array() {
                 for val in arr {
                     result.push(val.as_f64().unwrap_or(0.0) as f32);
-                }
-            }
-        }
+                 }
+             }
+         }
 
         Ok(result)
-    }
+     }
 }
 
 impl EmbeddingProvider for OllamaEmbeddingProvider {
     fn embed(&self, input: &str) -> Result<Vec<f32>, EmbedError> {
         let rt = tokio::runtime::Runtime::new().map_err(|e| EmbedError::NotAvailable(e.to_string()))?;
         rt.block_on(self.embed_async(input))
-    }
+     }
 
     fn model_name(&self) -> &str {
-        &self.model
-    }
+         &self.model
+     }
 
     fn dimensions(&self) -> usize {
         self.dimensions
-    }
+     }
 }
 
 // --- Mock provider for tests ---
@@ -132,12 +132,12 @@ impl MockEmbeddingProvider {
             model: "mock-model".to_string(),
             calls: std::sync::Mutex::new(Vec::new()),
             fail: std::sync::Mutex::new(false),
-        }
-    }
+         }
+     }
 
     pub fn set_fail(&self, fail: bool) {
-        *self.fail.lock().unwrap() = fail;
-    }
+         *self.fail.lock().unwrap() = fail;
+     }
 }
 
 #[cfg(test)]
@@ -145,30 +145,30 @@ impl EmbeddingProvider for MockEmbeddingProvider {
     fn embed(&self, input: &str) -> Result<Vec<f32>, EmbedError> {
         if *self.fail.lock().unwrap() {
             return Err(EmbedError::NotAvailable("mock failure".to_string()));
-        }
+         }
         self.calls.lock().unwrap().push(input.to_string());
         let hash = djb2_hash(input);
         let mut vec = Vec::with_capacity(self.dimensions);
         for i in 0..self.dimensions {
             vec.push(((hash.wrapping_mul((i + 1) as u64)) % 1000) as f32 / 1000.0);
-        }
+         }
         Ok(vec)
-    }
+     }
 
     fn model_name(&self) -> &str {
-        &self.model
-    }
+         &self.model
+     }
 
     fn dimensions(&self) -> usize {
         self.dimensions
-    }
+     }
 }
 
 fn djb2_hash(s: &str) -> u64 {
     let mut hash: u64 = 5381;
     for b in s.bytes() {
         hash = hash.wrapping_mul(33).wrapping_add(b as u64);
-    }
+     }
     hash
 }
 
@@ -189,12 +189,12 @@ pub struct SearchRecord {
 impl SearchRecord {
     pub fn from_alias(record: &AliasRecord, vector: Vec<f32>) -> Self {
         let search_text = format!(
-            "{}\n{}\n{}\n{}",
+             "{}\n{}\n{}\n{}",
             record.name,
             record.command,
             record.description.as_deref().unwrap_or(""),
             record.tags.join(" ")
-        );
+         );
         Self {
             name: record.name.clone(),
             command: record.command.clone(),
@@ -204,8 +204,8 @@ impl SearchRecord {
             shell: format!("{:?}", record.shell).to_lowercase(),
             updated_at: record.updated_at,
             vector,
-        }
-    }
+         }
+     }
 }
 
 // --- Index Metadata ---
@@ -222,46 +222,43 @@ pub struct IndexMetadata {
 
 const TABLE_NAME: &str = "aliases";
 
-async fn connect_db(db_path: &str) -> Result<Db, LanceError> {
+async fn connect_db(db_path: &str) -> Result<Connection, LanceError> {
     lancedb::connect(db_path).execute().await
+}
+
+fn make_field(name: &str, dt: DataType, nullable: bool) -> Arc<Field> {
+    Arc::new(Field::new(name, dt, nullable))
 }
 
 fn make_schema(dimensions: usize) -> Schema {
     Schema::new(vec![
-        Field::new("name", DataType::Utf8, false),
-        Field::new("command", DataType::Utf8, false),
-        Field::new("search_text", DataType::Utf8, false),
-        Field::new("tags", DataType::Utf8, false),
-        Field::new("source", DataType::Utf8, false),
-        Field::new("shell", DataType::Utf8, false),
-        Field::new("updated_at", DataType::UInt64, false),
-        Field::new(
+        Arc::new(Field::new("name", DataType::Utf8, false)),
+        Arc::new(Field::new("command", DataType::Utf8, false)),
+        Arc::new(Field::new("search_text", DataType::Utf8, false)),
+        Arc::new(Field::new("tags", DataType::Utf8, false)),
+        Arc::new(Field::new("source", DataType::Utf8, false)),
+        Arc::new(Field::new("shell", DataType::Utf8, false)),
+        Arc::new(Field::new("updated_at", DataType::UInt64, false)),
+        Arc::new(Field::new(
             "vector",
             DataType::FixedSizeList(
-                Box::new(Field::new("item", DataType::Float32, true)),
+                Arc::new(Field::new("item", DataType::Float32, true)),
                 dimensions as i32,
             ),
             false,
-        ),
+        )),
     ])
 }
 
-async fn get_or_create_table(db: &Db, dimensions: usize) -> Result<lancedb::Table, LanceError> {
-    if db.table(TABLE_NAME).exists() {
+async fn get_or_create_table(db: &Connection, dimensions: usize) -> Result<lancedb::Table, LanceError> {
+    let names = db.table_names().execute().await?;
+    if names.contains(&TABLE_NAME.to_string()) {
         db.open_table(TABLE_NAME).execute().await
     } else {
         let schema = make_schema(dimensions);
-        let empty_batch = RecordBatch::try_new(
-            Arc::new(schema.clone()),
-            vec![],
-        ).expect("empty batch should match schema");
-
-        let batches = vec![Ok(empty_batch)];
-        let iter = batches.into_iter();
-
-        db.create_table(TABLE_NAME, iter)
-            .execute()
-            .await
+        db.create_empty_table(TABLE_NAME, Arc::new(schema))
+             .execute()
+             .await
     }
 }
 
@@ -281,17 +278,17 @@ pub async fn reindex_aliases<P: EmbeddingProvider>(
             embedding_model: provider.model_name().to_string(),
             vector_dimensions: provider.dimensions(),
             alias_count: 0,
-        });
-    }
+         });
+     }
 
     let records: Vec<SearchRecord> = store
-        .aliases
-        .iter()
-        .filter_map(|alias| {
+         .aliases
+         .iter()
+         .filter_map(|alias| {
             let vector = provider.embed(&alias.command).ok()?;
             Some(SearchRecord::from_alias(alias, vector))
-        })
-        .collect();
+         })
+         .collect();
 
     if records.is_empty() {
         return Ok(IndexMetadata {
@@ -299,8 +296,8 @@ pub async fn reindex_aliases<P: EmbeddingProvider>(
             embedding_model: provider.model_name().to_string(),
             vector_dimensions: provider.dimensions(),
             alias_count: 0,
-        });
-    }
+         });
+     }
 
     let dims = provider.dimensions();
     let schema = make_schema(dims);
@@ -308,7 +305,8 @@ pub async fn reindex_aliases<P: EmbeddingProvider>(
     let name_arr: arrow_array::StringArray = records.iter().map(|r| Some(&r.name)).collect();
     let cmd_arr: arrow_array::StringArray = records.iter().map(|r| Some(&r.command)).collect();
     let stxt_arr: arrow_array::StringArray = records.iter().map(|r| Some(&r.search_text)).collect();
-    let tags_arr: arrow_array::StringArray = records.iter().map(|r| Some(&r.tags.join(" "))).collect();
+    let tags_strings: Vec<String> = records.iter().map(|r| r.tags.join(" ")).collect();
+    let tags_arr: arrow_array::StringArray = tags_strings.iter().map(|s| Some(s.as_str())).collect();
     let src_arr: arrow_array::StringArray = records.iter().map(|r| Some(&r.source)).collect();
     let shell_arr: arrow_array::StringArray = records.iter().map(|r| Some(&r.shell)).collect();
     let updated_arr: arrow_array::UInt64Array = records.iter().map(|r| Some(r.updated_at)).collect();
@@ -317,12 +315,12 @@ pub async fn reindex_aliases<P: EmbeddingProvider>(
     let total_vectors = records.len();
     let all_floats: Float32Array = records.iter().flat_map(|r| r.vector.iter().copied()).collect();
 
-    let list_data = arrow_array::ArrayData::builder(DataType::FixedSizeList(
-        Box::new(Field::new("item", DataType::Float32, true)),
+    let list_data = arrow_data::ArrayData::builder(DataType::FixedSizeList(
+        Arc::new(Field::new("item", DataType::Float32, true)),
         dim,
     ))
     .len(total_vectors)
-    .add_child_data(all_floats.to_data())
+    .add_child_data(all_floats.into_data())
     .build()
     .expect("vector array data should build");
 
@@ -342,7 +340,9 @@ pub async fn reindex_aliases<P: EmbeddingProvider>(
         ],
     ).map_err(|e| SearchError::Schema(e.to_string()))?;
 
-    let _ = table.delete("1=1").execute().await;
+    if table.count_rows(None).await.unwrap_or(0) > 0 {
+        let _ = table.delete("1=1").await;
+    }
     table.add(vec![batch]).execute().await?;
 
     Ok(IndexMetadata {
@@ -370,45 +370,36 @@ pub async fn search_aliases<P: EmbeddingProvider>(
     limit: usize,
 ) -> Result<Vec<SearchResult>, SearchError> {
     let db = connect_db(db_path).await?;
-    if !db.table(TABLE_NAME).exists() {
+    let names = db.table_names().execute().await?;
+    if !names.contains(&TABLE_NAME.to_string()) {
         return Ok(Vec::new());
-    }
+     }
 
     let table = db.open_table(TABLE_NAME).execute().await?;
     let query_vector = provider.embed(query)?;
 
-    let dims = provider.dimensions() as i32;
-    let vec_data = arrow_array::ArrayData::builder(DataType::FixedSizeList(
-        Box::new(Field::new("item", DataType::Float32, true)),
-        dims,
-    ))
-    .len(1)
-    .add_child_data(Float32Array::from(query_vector).to_data())
-    .build()
-    .expect("query vector data should build");
-
-    let vec_array = FixedSizeListArray::from(vec_data);
-
-    let results = table
-        .query()
-        .select(vec!["name", "command", "search_text", "tags"])
-        .nearest_to(vec_array)
-        .distance_type(DistanceType::Cosine)
-        .limit(limit)
-        .execute()
-        .await?;
+    let stream = table
+         .query()
+         .select(lancedb::query::Select::Columns(vec!["name".to_string(), "command".to_string(), "search_text".to_string(), "tags".to_string()]))
+         .nearest_to(query_vector)?
+         .distance_type(DistanceType::Cosine)
+         .limit(limit)
+         .execute()
+         .await?;
 
     let mut search_results = Vec::new();
-    for batch in results {
+    use futures::TryStreamExt;
+    let batches: Vec<RecordBatch> = stream.try_collect().await.unwrap_or_default();
+    for batch in &batches {
         let name_col = batch
-            .column_by_name("name")
-            .and_then(|c| c.as_any().downcast_ref::<arrow_array::StringArray>());
+             .column_by_name("name")
+             .and_then(|c| c.as_any().downcast_ref::<arrow_array::StringArray>());
         let cmd_col = batch
-            .column_by_name("command")
-            .and_then(|c| c.as_any().downcast_ref::<arrow_array::StringArray>());
+             .column_by_name("command")
+             .and_then(|c| c.as_any().downcast_ref::<arrow_array::StringArray>());
         let dist_col = batch
-            .column_by_name("_distance")
-            .and_then(|c| c.as_any().downcast_ref::<arrow_array::Float64Array>());
+             .column_by_name("_distance")
+             .and_then(|c| c.as_any().downcast_ref::<arrow_array::Float64Array>());
 
         for i in 0..batch.num_rows() {
             let name = name_col.map(|c| c.value(i).to_string()).unwrap_or_default();
@@ -421,9 +412,9 @@ pub async fn search_aliases<P: EmbeddingProvider>(
                 command,
                 score: similarity,
                 reason: format!("semantic similarity {:.2}", similarity),
-            });
-        }
-    }
+             });
+         }
+     }
 
     Ok(search_results)
 }
@@ -448,22 +439,22 @@ pub fn lexical_search(store: &AliasStore, query: &str, limit: usize) -> Vec<Sear
         if name_lower == query_lower || query_words.iter().any(|w| name_lower.contains(w)) {
             score += 0.8;
             match_reasons.push("name match");
-        }
+         }
 
         if cmd_lower == query_lower || query_words.iter().any(|w| cmd_lower.contains(w)) {
             score += 0.6;
             match_reasons.push("command match");
-        }
+         }
 
         if !desc_lower.is_empty() && (desc_lower == query_lower || query_words.iter().any(|w| desc_lower.contains(w))) {
             score += 0.3;
             match_reasons.push("description match");
-        }
+         }
 
         if query_words.iter().any(|w| tags_lower.contains(w)) {
             score += 0.2;
             match_reasons.push("tag match");
-        }
+         }
 
         if score > 0.0 {
             scored.push(SearchResult {
@@ -471,9 +462,9 @@ pub fn lexical_search(store: &AliasStore, query: &str, limit: usize) -> Vec<Sear
                 command: alias.command.clone(),
                 score,
                 reason: match_reasons.join(", "),
-            });
-        }
-    }
+             });
+         }
+     }
 
     scored.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
     scored.truncate(limit);
@@ -489,15 +480,15 @@ pub async fn refresh_alias_index_after_mutation<P: EmbeddingProvider>(
 ) {
     if let Err(e) = reindex_aliases(db_path, store, provider).await {
         eprintln!("Warning: index refresh failed: {}", e);
-    }
+     }
 }
 
 // --- Default Index Path ---
 
 pub fn default_index_path() -> std::path::PathBuf {
     dirs::home_dir()
-        .unwrap_or_else(|| std::path::PathBuf::from("/"))
-        .join(".config")
-        .join("aliasman")
-        .join("index")
+         .unwrap_or_else(|| std::path::PathBuf::from("/"))
+         .join(".config")
+         .join("aliasman")
+         .join("index")
 }

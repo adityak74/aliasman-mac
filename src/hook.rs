@@ -206,6 +206,7 @@ pub fn score_alias(record: &AliasRecord, signals: &[String]) -> f64 {
         AliasSource::User => score += 2.0,
         AliasSource::Imported => score += 1.0,
         AliasSource::Suggested => {}
+        AliasSource::Pack(_) => score += 1.5,
        }
 
     score
@@ -273,16 +274,18 @@ pub fn format_alias_context(aliases: &[(AliasRecord, f64)]) -> String {
 /// The hook output JSON structure for Claude SessionStart.
 #[derive(Debug, Serialize)]
 pub struct HookOutput {
-    pub continue: bool,
+    #[serde(rename = "continue")]
+    pub proceed: bool,
+    #[serde(rename = "suppressOutput")]
     pub suppress_output: bool,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "additionalContext", skip_serializing_if = "Option::is_none")]
     pub additional_context: Option<String>,
 }
 
 impl HookOutput {
     pub fn new(context: Option<String>) -> Self {
         HookOutput {
-             continue: true,
+             proceed: true,
             suppress_output: true,
             additional_context: context,
            }
@@ -346,6 +349,7 @@ mod tests {
             source,
             created_at: 1715300000,
             updated_at: 1715300000,
+    modified_by_user: false,
            }
     }
 
@@ -489,6 +493,7 @@ mod tests {
                 source: AliasSource::User,
                 created_at: 0,
                 updated_at: 0,
+    modified_by_user: false,
                },
             5.0,
            )];
@@ -520,7 +525,7 @@ mod tests {
         // Read back and check hook appears only once
         let content = fs::read_to_string(&settings_path).unwrap();
         assert_eq!(
-             content.matches("aliasman"),
+             content.matches("aliasman").count(),
             1,
             "hook should appear exactly once: {}",
             content

@@ -227,7 +227,7 @@ pub fn format_verbose_stats(frequencies: &[(String, usize)]) -> String {
         let top_cmd = entries
              .iter()
              .max_by_key(|(_, c)| *c)
-             .map(|(c, _)| c.0.as_str())
+             .map(|(c, _)| c.as_str())
              .unwrap_or("");
 
         output.push_str(&format!(

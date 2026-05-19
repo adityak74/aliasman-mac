@@ -14,6 +14,7 @@ fn make_record(name: &str, command: &str) -> AliasRecord {
         source: AliasSource::User,
         created_at: 0,
         updated_at: 0,
+    modified_by_user: false,
     }
 }
 

@@ -1,0 +1,182 @@
+[manifest]
+name = "docker"
+version = "1.0.0"
+description = "Docker and Docker Compose aliases for common operations"
+author = "aliasman"
+format_version = "0.1"
+
+[[aliases]]
+name = "d"
+command = "docker"
+tags = ["docker", "core"]
+shell = "all"
+created_at = 1779200000
+updated_at = 1779200000
+
+[aliases.source]
+pack = "docker"
+
+[[aliases]]
+name = "dps"
+command = "docker ps"
+tags = ["docker", "ps"]
+shell = "all"
+created_at = 1779200000
+updated_at = 1779200000
+
+[aliases.source]
+pack = "docker"
+
+[[aliases]]
+name = "dpsa"
+command = "docker ps -a"
+tags = ["docker", "ps", "all"]
+shell = "all"
+created_at = 1779200000
+updated_at = 1779200000
+
+[aliases.source]
+pack = "docker"
+
+[[aliases]]
+name = "dimg"
+command = "docker images"
+tags = ["docker", "images"]
+shell = "all"
+created_at = 1779200000
+updated_at = 1779200000
+
+[aliases.source]
+pack = "docker"
+
+[[aliases]]
+name = "dlogs"
+command = "docker logs -f"
+tags = ["docker", "logs"]
+shell = "all"
+created_at = 1779200000
+updated_at = 1779200000
+
+[aliases.source]
+pack = "docker"
+
+[[aliases]]
+name = "dexec"
+command = "docker exec -it"
+tags = ["docker", "exec"]
+shell = "all"
+created_at = 1779200000
+updated_at = 1779200000
+
+[aliases.source]
+pack = "docker"
+
+[[aliases]]
+name = "dstop"
+command = "docker stop"
+tags = ["docker", "stop"]
+shell = "all"
+created_at = 1779200000
+updated_at = 1779200000
+
+[aliases.source]
+pack = "docker"
+
+[[aliases]]
+name = "drm"
+command = "docker rm"
+tags = ["docker", "remove"]
+shell = "all"
+created_at = 1779200000
+updated_at = 1779200000
+
+[aliases.source]
+pack = "docker"
+
+[[aliases]]
+name = "dprune"
+command = "docker system prune -f"
+tags = ["docker", "prune", "cleanup"]
+shell = "all"
+created_at = 1779200000
+updated_at = 1779200000
+
+[aliases.source]
+pack = "docker"
+
+[[aliases]]
+name = "dc"
+command = "docker compose"
+tags = ["docker", "compose"]
+shell = "all"
+created_at = 1779200000
+updated_at = 1779200000
+
+[aliases.source]
+pack = "docker"
+
+[[aliases]]
+name = "dcup"
+command = "docker compose up -d"
+tags = ["docker", "compose", "up"]
+shell = "all"
+created_at = 1779200000
+updated_at = 1779200000
+
+[aliases.source]
+pack = "docker"
+
+[[aliases]]
+name = "dcdown"
+command = "docker compose down"
+tags = ["docker", "compose", "down"]
+shell = "all"
+created_at = 1779200000
+updated_at = 1779200000
+
+[aliases.source]
+pack = "docker"
+
+[[aliases]]
+name = "dcpull"
+command = "docker compose pull"
+tags = ["docker", "compose", "pull"]
+shell = "all"
+created_at = 1779200000
+updated_at = 1779200000
+
+[aliases.source]
+pack = "docker"
+
+[[aliases]]
+name = "dclogs"
+command = "docker compose logs -f"
+tags = ["docker", "compose", "logs"]
+shell = "all"
+created_at = 1779200000
+updated_at = 1779200000
+
+[aliases.source]
+pack = "docker"
+
+[[aliases]]
+name = "dcrebuild"
+command = "docker compose up -d --build"
+tags = ["docker", "compose", "rebuild"]
+shell = "all"
+created_at = 1779200000
+updated_at = 1779200000
+
+[aliases.source]
+pack = "docker"
+
+[[aliases]]
+name = "dcp"
+command = "docker compose ps"
+tags = ["docker", "compose", "ps"]
+shell = "all"
+created_at = 1779200000
+updated_at = 1779200000
+
+[aliases.source]
+pack = "docker"

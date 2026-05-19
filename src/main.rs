@@ -15,11 +15,21 @@ use aliasman::import::{
     merge_imported_aliases, parse_alias_lines, shell_kind_to_alias_shell,
 };
 use aliasman::mcp::run_mcp_server;
-use aliasman::model::{AliasShell, AliasSource};
+use aliasman::model::{AliasRecord, AliasShell, AliasSource};
+use aliasman::pack_registry::PackRegistry;
+use aliasman::pack_installer::{
+    install_pack, parse_pack_file, download_pack,
+    create_install_preview as create_pack_install_preview,
+};
+use aliasman::pack_manager::{
+    add_alias_to_pack, create_pack, export_pack_to_file,
+    pack_exists,
+};
 use aliasman::search::{
     default_index_path, lexical_search, reindex_aliases, search_aliases,
-    OllamaEmbeddingProvider, SearchResult, DEFAULT_SEARCH_LIMIT,
+    OllamaEmbeddingProvider, SearchResult,
 };
+use chrono::TimeZone;
 use aliasman::shell::{detect_shell_and_config, DetectResult, ShellKind};
 use aliasman::store::{
     backup_file, prune_backups, store_add_alias, store_delete_alias, store_list_aliases,
@@ -197,8 +207,91 @@ enum Cli {
         /// Path to canonical aliasman data file
         #[arg(long)]
         data_file: Option<PathBuf>,
-    },
+     },
+
+     /// Manage alias packs — create, add, export
+    Pack {
+         /// Pack subcommand
+        #[command(subcommand)]
+        subcmd: PackSubcommand,
+         /// Path to canonical aliasman data file
+         #[arg(long, global = true)]
+        data_file: Option<PathBuf>,
+         /// Path to the managed aliases output file
+         #[arg(long, global = true)]
+        aliases_file: Option<PathBuf>,
+    }
 }
+
+#[derive(clap::Parser, Debug, Clone)]
+pub enum PackSubcommand {
+     /// Create a new alias pack
+    Create {
+         /// Pack name (alphanumeric, hyphens, underscores)
+        name: String,
+         /// Pack version (semver, default: 0.1.0)
+         #[arg(long, default_value = "0.1.0")]
+        version: String,
+         /// Pack description
+         #[arg(long)]
+        description: Option<String>,
+         /// Author name
+         #[arg(long)]
+        author: Option<String>,
+    },
+
+     /// Add an alias to an existing pack
+    Add {
+         /// Pack name
+        pack: String,
+         /// Alias name
+         #[arg(long)]
+        name: String,
+         /// Alias command
+         #[arg(long)]
+        command: String,
+         /// Optional description
+         #[arg(long)]
+        description: Option<String>,
+         /// Optional tags (can be repeated)
+         #[arg(long)]
+        tag: Vec<String>,
+    },
+
+    /// List all installed packs
+    List,
+
+     /// Export a pack as a single shareable TOML file
+    Export {
+         /// Pack name to export
+        pack: String,
+         /// Output file path (default: /tmp/{pack}-pack.toml)
+         #[arg(long)]
+        output: Option<PathBuf>,
+    },
+
+    /// Install a pack from a file or URL with safety scanning
+    Install {
+        /// Path to the pack export TOML file (mutually exclusive with --url)
+        file: Option<PathBuf>,
+        /// URL to download the pack from (mutually exclusive with --file)
+        #[arg(long)]
+        url: Option<String>,
+        /// Force install despite safety warnings or collisions
+        #[arg(long)]
+        force: bool,
+    },
+
+     /// Remove an installed pack and its aliases
+    Remove {
+         /// Pack name to remove
+        name: String,
+     },
+
+      /// Install builtin packs (k8s, docker)
+    InstallBuiltin,
+}
+
 
 fn default_home() -> PathBuf {
     dirs::home_dir().unwrap_or_else(|| PathBuf::from("/"))
@@ -240,7 +333,43 @@ fn regenerate_aliases(
     aliases_file: &Path,
     store: &AliasStore,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    write_managed_aliases(aliases_file, store)?;
+     // Merge pack aliases at render time
+    let mut merged = store.aliases.clone();
+    let registry = aliasman::pack_registry::PackRegistry::load().unwrap_or_default();
+    for entry in registry.list_packs() {
+        let pack_dir = aliasman::pack_manager::get_pack_dir(&entry.name).unwrap_or_else(|_| {
+            PathBuf::from("/dev/null")
+          });
+        if let Ok(pack_aliases) = aliasman::pack_manager::load_pack_aliases(&entry.name) {
+            merged.extend(pack_aliases);
+         }
+        let _ = pack_dir; // suppress unused warning
+      }
+
+      // Render merged aliases
+    let mut output = String::new();
+    output.push_str("# aliasman managed - do not edit manually\n");
+    output.push_str("# Run `aliasman list` to view aliases.\n");
+
+    let mut sorted = merged;
+    sorted.sort_by(|a, b| a.name.cmp(&b.name));
+
+      // Deduplicate: later entries win (pack aliases overwrite user aliases of same name)
+    let mut seen = std::collections::HashMap::new();
+    for record in sorted {
+        seen.insert(record.name.clone(), record);
+      }
+
+    let mut final_list: Vec<aliasman::model::AliasRecord> = seen.into_values().collect();
+    final_list.sort_by(|a, b| a.name.cmp(&b.name));
+
+    for record in final_list {
+        let escaped_command = record.command.replace('\'', "'\\''");
+        output.push_str(&format!("alias {}='{}'\n", record.name, escaped_command));
+      }
+
+      // Write atomically
+    aliasman::store::write_atomic(aliases_file, &output)?;
     Ok(())
 }
 
@@ -354,7 +483,7 @@ fn run_init(
 
     let (new_records, _) = build_imported_records(&store, parsed_aliases, alias_shell);
     for record in new_records {
-        store.aliases.push(record);
+        store.aliases.push(record.clone());
      }
 
     if config_path.exists() {
@@ -369,10 +498,90 @@ fn run_init(
     regenerate_aliases(aliases_file, &store)?;
     refresh_index(store.clone());
 
+    // Install builtin packs
+    install_builtin_packs(data_file, aliases_file)?;
+
     println!("\n═══ init complete ═══");
     println!("Data file written: {}", data_file.display());
     println!("Managed aliases written: {}", aliases_file.display());
     print_reload_hint();
+
+    Ok(())
+}
+
+fn install_builtin_packs(
+    data_file: &Path,
+    aliases_file: &Path,
+) -> Result<(), Box<dyn std::error::Error>> {
+     // Find builtin packs directory (same dir as binary)
+    let self_bin = std::env::current_exe().map_err(|e| {
+        format!("Failed to get exe path: {}", e)
+     })?;
+    let bin_dir = self_bin.parent().ok_or("Cannot determine binary directory")?;
+
+     // Look for builtin_packs in common locations
+    let builtin_dirs = vec![
+        bin_dir.join("builtin_packs"),
+        bin_dir.join("..").join("share").join("aliasman").join("builtin_packs"),
+        PathBuf::from("/usr/local/share/aliasman/builtin_packs"),
+    ];
+
+    let builtin_dir = builtin_dirs.into_iter().find(|d| d.exists());
+    let Some(bd) = builtin_dir else {
+        return Ok(()); // No builtin packs available, that's fine
+    };
+
+     // Ensure config builtin_packs directory exists
+    if let Some(home) = dirs::home_dir() {
+        let config_builtin_dir = home.join(".config").join("aliasman").join("builtin_packs");
+        fs::create_dir_all(&config_builtin_dir)?;
+
+        let mut installed_count = 0usize;
+        for entry in fs::read_dir(&bd)? {
+            let entry = entry?;
+            let path = entry.path();
+            if path.extension() == Some(std::ffi::OsStr::new("toml")) {
+                let file_name = path.file_name().unwrap_or_default();
+                let dest = config_builtin_dir.join(file_name);
+
+                 // Only install if not already installed
+                if !dest.exists() {
+                    fs::copy(&path, &dest)?;
+
+                     // Install via pack installer
+                    if let Ok(export) = aliasman::pack_installer::parse_pack_file(&dest) {
+                        let store = load_store(data_file)?;
+                        let source = format!("builtin: {}", path.display());
+
+                         // Skip if pack already registered
+                        let registry = aliasman::pack_registry::PackRegistry::load().unwrap_or_default();
+
+                        if registry.get_pack(&export.manifest.name).is_some() {
+                            continue;
+                             }
+
+                         // Install without safety check (builtin packs are trusted)
+                        if let Ok(result) = aliasman::pack_installer::install_pack(
+                            export,
+                            true, // force
+                            &store,
+                            source,
+                        ) {
+                            installed_count += 1;
+                            println!("  Builtin pack '{}' installed ({} aliases)", result.pack_name, result.installed_count);
+                        }
+                    }
+                }
+            }
+        }
+
+        if installed_count > 0 {
+             // Regenerate aliases after builtin pack installation
+            let store = load_store(data_file)?;
+            regenerate_aliases(aliases_file, &store)?;
+            refresh_index(store);
+        }
+    }
 
     Ok(())
 }
@@ -396,7 +605,7 @@ fn run_add(
 
     let mut store = load_store(data_file)?;
     store_add_alias(&mut store, name.to_string(), command.to_string(), description, tags, AliasShell::All)
-        .map_err(|e| e as Box<dyn std::error::Error>)?;
+        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
 
     save_store(&store, data_file)?;
     regenerate_aliases(aliases_file, &store)?;
@@ -423,7 +632,7 @@ fn run_update(
 
     let mut store = load_store(data_file)?;
     store_update_alias(&mut store, name, command, description, tags)
-        .map_err(|e| e as Box<dyn std::error::Error>)?;
+        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
 
     save_store(&store, data_file)?;
     regenerate_aliases(aliases_file, &store)?;
@@ -441,7 +650,7 @@ fn run_delete(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let mut store = load_store(data_file)?;
     store_delete_alias(&mut store, name)
-        .map_err(|e| e as Box<dyn std::error::Error>)?;
+        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
 
     save_store(&store, data_file)?;
     regenerate_aliases(aliases_file, &store)?;
@@ -469,8 +678,67 @@ fn run_list(
     if aliases.is_empty() {
         println!("No aliases found.");
         return Ok(());
+    }
+
+     // Group by source category
+    // Categorize by source
+    let mut user_aliases: Vec<AliasRecord> = Vec::new();
+    let mut imported_aliases: Vec<AliasRecord> = Vec::new();
+    let mut suggested_aliases: Vec<AliasRecord> = Vec::new();
+    let mut pack_map: std::collections::HashMap<String, Vec<AliasRecord>> = std::collections::HashMap::new();
+
+    for record in aliases {
+        let pack_name = match &record.source {
+            AliasSource::Pack(p) => Some(p.clone()),
+            _ => None,
+         };
+
+        match record.source {
+            AliasSource::User => user_aliases.push(record.clone()),
+            AliasSource::Imported => imported_aliases.push(record.clone()),
+            AliasSource::Suggested => suggested_aliases.push(record.clone()),
+            AliasSource::Pack(_) => {
+                if let Some(p) = pack_name {
+                    pack_map.entry(p).or_default().push(record.clone());
+                 }
+             },
+         }
      }
 
+    let mut first = true;
+
+    if !user_aliases.is_empty() {
+        if !first { println!(); }
+        println!("── user ({}) ──", user_aliases.len());
+        print_alias_table(&user_aliases);
+        first = false;
+     }
+
+    if !imported_aliases.is_empty() {
+        if !first { println!(); }
+        println!("── imported ({}) ──", imported_aliases.len());
+        print_alias_table(&imported_aliases);
+        first = false;
+     }
+
+    if !suggested_aliases.is_empty() {
+        if !first { println!(); }
+        println!("── suggested ({}) ──", suggested_aliases.len());
+        print_alias_table(&suggested_aliases);
+        first = false;
+     }
+
+    for (pack_name, pack_list) in &pack_map {
+        if !first { println!(); }
+        println!("── pack: {} ({}) ──", pack_name, pack_list.len());
+        print_alias_table(pack_list);
+        first = false;
+     }
+
+    Ok(())
+}
+
+fn print_alias_table(aliases: &[AliasRecord]) {
     println!("{:<20} {:<40} {:<10}", "Name", "Command", "Source");
     println!("{:-<20} {:-<40} {:-<10}", "", "", "");
 
@@ -479,18 +747,16 @@ fn run_list(
             AliasSource::User => "user",
             AliasSource::Imported => "imported",
             AliasSource::Suggested => "suggested",
+            AliasSource::Pack(ref p) => p.as_str(),
          };
         println!(
-            "{:<20} {:<40} {:<10}",
+             "{:<20} {:<40} {:<10}",
             record.name,
             truncate(&record.command, 40),
             source
          );
      }
-
-    Ok(())
 }
-
 fn run_stats(
     history_file: Option<PathBuf>,
     verbose: bool,
@@ -560,7 +826,7 @@ fn run_suggest(
                     vec!["suggested".to_string()],
                     AliasShell::All,
                  )
-                 .map_err(|e| e as Box<dyn std::error::Error>)?;
+                 .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
 
                 save_store(&store, data_file)?;
                 regenerate_aliases(aliases_file, &store)?;
@@ -609,9 +875,8 @@ fn run_hook(
     match mode {
         "install" => {
             let home = default_home();
-            let sf = settings_file.unwrap_or_else(|| {
-                &home.join(".claude").join("settings.json")
-             });
+            let default_sf = home.join(".claude").join("settings.json");
+            let sf = settings_file.unwrap_or_else(|| &default_sf);
 
             let self_bin = std::env::args()
                 .next()
@@ -642,9 +907,8 @@ fn run_hook(
 
         "preview" => {
             let home = default_home();
-            let sf = settings_file.unwrap_or_else(|| {
-                &home.join(".claude").join("settings.json")
-             });
+            let default_sf = home.join(".claude").join("settings.json");
+            let sf = settings_file.unwrap_or_else(|| &default_sf);
 
             let self_bin = std::env::args()
                 .next()
@@ -719,7 +983,7 @@ fn run_search(
     let rt = tokio::runtime::Runtime::new()?;
     let mut results: Vec<SearchResult> = rt.block_on(
         search_aliases(&db_str, query, &provider, limit)
-    );
+    )?;
 
     let used_fallback = if results.is_empty() {
         results = lexical_search(&store, query, limit);
@@ -770,6 +1034,189 @@ fn run_mcp(
             std::process::exit(1);
          }
      }
+    Ok(())
+}
+
+fn run_pack(
+    subcmd: PackSubcommand,
+    data_file: &Path,
+    aliases_file: &Path,
+) -> Result<(), Box<dyn std::error::Error>> {
+    match subcmd {
+        PackSubcommand::Create {
+            name,
+            version,
+            description,
+            author,
+        } => {
+            let pack_dir = create_pack(name.clone(), version, description, author)
+                .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+            println!("Created pack '{}' in {}", name, pack_dir.display());
+            println!("Add aliases with: aliasman pack add {} --name <alias> --command <cmd>", name);
+        }
+        PackSubcommand::Add {
+            pack,
+            name,
+            command,
+            description,
+            tag,
+        } => {
+            if !pack_exists(&pack) {
+                eprintln!("Error: Pack '{}' does not exist. Create it first with: aliasman pack create {}", pack, pack);
+                std::process::exit(1);
+            }
+            add_alias_to_pack(
+                 &pack, name.clone(), command.clone(), description.clone(), tag.clone(), AliasShell::All,
+            ).map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+            // Also add to main store and regenerate
+            let mut store = load_store(data_file)?;
+            aliasman::store::store_add_alias(
+                 &mut store, name.clone(), command.clone(), description, tag, AliasShell::All,
+            ).map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+            save_store(&store, data_file)?;
+            regenerate_aliases(aliases_file, &store)?;
+            refresh_index(store.clone());
+            println!("Added alias '{}' to pack '{}'", name, pack);
+            print_reload_hint();
+        }
+        PackSubcommand::List => {
+            let registry = PackRegistry::load().map_err(|e| {
+                std::io::Error::new(std::io::ErrorKind::Other, e)
+             })?;
+            let packs = registry.list_packs();
+            if packs.is_empty() {
+                println!("No installed packs. Use: aliasman pack install <file>");
+                 return Ok(());
+             }
+            println!("{:<20} {:<10} {:<15} {:<10}", "Name", "Version", "Installed", "Aliases");
+            println!("{:-<20} {:<10} {:<15} {:<10}", "", "", "", "");
+            for p in packs {
+                let date = match chrono::Local.timestamp_opt(p.install_time as i64, 0) {
+                        chrono::LocalResult::Single(dt) => dt.format("%Y-%m-%d").to_string(),
+                        _ => "unknown".to_string(),
+                    };
+                println!("{:<20} {:<10} {:<15} {:<10}", p.name, p.version, date, p.alias_count);
+                    }
+        }
+        PackSubcommand::Export { pack, output } => {
+            if !pack_exists(&pack) {
+                eprintln!("Error: Pack '{}' does not exist.", pack);
+                std::process::exit(1);
+            }
+            let out = output.unwrap_or_else(|| {
+                std::path::PathBuf::from("/tmp").join(format!("{}-pack.toml", pack))
+            });
+            export_pack_to_file(&pack, &out)
+                .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+            println!("Exported pack '{}' to {}", pack, out.display());
+        }
+        PackSubcommand::Install { file, url, force } => {
+            // Validate: exactly one of --file or --url must be provided
+            let (export, source) = if let Some(ref fpath) = file {
+                let export = parse_pack_file(fpath)
+                    .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+                (export, format!("file: {}", fpath.display()))
+            } else if let Some(ref u) = url {
+                let rt = tokio::runtime::Runtime::new()
+                    .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+                let content = rt.block_on(download_pack(u))
+                    .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+                let export: aliasman::pack_manager::PackExport =
+                    toml::from_str(&content)
+                    .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+                (export, format!("url: {}", u))
+            } else {
+                eprintln!("Error: Provide either a file path or --url");
+                eprintln!("Usage: aliasman pack install <file.toml>");
+                eprintln!("       aliasman pack install --url https://example.com/pack.toml");
+                std::process::exit(1);
+            };
+
+            let store = load_store(data_file)?;
+            let preview = create_pack_install_preview(&export, &store, source.clone());
+            preview.display();
+
+            // In non-interactive mode (or if no warnings/collisions), proceed
+            if !preview.warnings.is_empty() && !force {
+                eprintln!("\nInstall blocked due to safety warnings. Use --force to override.");
+                std::process::exit(1);
+            }
+
+            let result = install_pack(export, force, &store, source)
+                .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+
+            // Post-install: regenerate aliases and refresh index
+            regenerate_aliases(aliases_file, &load_store(data_file)?)?;
+            refresh_index(load_store(data_file)?);
+
+            println!("\nPack '{}' installed successfully!", result.pack_name);
+            println!("  Aliases installed: {}", result.installed_count);
+            if !result.skipped_collisions.is_empty() {
+                println!("  Skipped collisions: {}", result.skipped_collisions.len());
+            }
+            print_reload_hint();
+         }
+        PackSubcommand::Remove { name } => {
+             // Check if pack is registered
+            let mut registry = PackRegistry::load()
+                 .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+
+            if registry.get_pack(&name).is_none() {
+                eprintln!("Error: Pack '{}' is not installed.", name);
+                std::process::exit(1);
+             }
+
+             // Load store and remove pack aliases (preserve modified_by_user)
+            let mut store = load_store(data_file)?;
+            let mut removed_count = 0usize;
+            let mut preserved_count = 0usize;
+
+            let mut new_aliases = Vec::new();
+            for mut a in store.aliases {
+                if matches!(&a.source, AliasSource::Pack(p) if p == &name) {
+                    if a.modified_by_user {
+                        a.source = AliasSource::User;
+                        preserved_count += 1;
+                        new_aliases.push(a);
+                     } else {
+                        removed_count += 1;
+                     }
+                 } else {
+                    new_aliases.push(a);
+                 }
+              }
+            store.aliases = new_aliases;
+
+             // Save updated store
+            save_store(&store, data_file)?;
+
+             // Remove pack directory
+            let pack_dir = aliasman::pack_manager::get_pack_dir(&name)
+                 .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+            if pack_dir.exists() {
+                fs::remove_dir_all(&pack_dir)?;
+             }
+
+             // Unregister from registry
+            registry.unregister_pack(&name);
+            registry.save()?;
+
+             // Post-remove: regenerate aliases and refresh index
+            regenerate_aliases(aliases_file, &store)?;
+            refresh_index(store);
+
+            println!("Pack '{}' removed successfully!", name);
+            println!("  Aliases removed: {}", removed_count);
+            if preserved_count > 0 {
+                println!("  User-modified aliases preserved: {}", preserved_count);
+             }
+            print_reload_hint();
+          }
+        PackSubcommand::InstallBuiltin => {
+            install_builtin_packs(data_file, aliases_file)?;
+            println!("Builtin packs installation complete.");
+          }
+    }
     Ok(())
 }
 
@@ -882,7 +1329,7 @@ fn main() {
          } => {
             let home_dir = default_home();
             let df = data_file.unwrap_or_else(|| default_data_file(&home_dir));
-            let sf = settings_file.as_ref();
+            let sf = settings_file.as_ref().map(|p| p.as_path());
 
             run_hook(
                 &mode,
@@ -913,6 +1360,17 @@ fn main() {
 
             run_mcp(&mode, &df)
          }
+        Cli::Pack {
+            subcmd,
+            data_file,
+            aliases_file,
+           } => {
+            let home_dir = default_home();
+            let df = data_file.unwrap_or_else(|| default_data_file(&home_dir));
+            let af = aliases_file.unwrap_or_else(|| home_dir.join(".aliases"));
+
+            run_pack(subcmd, &df, &af)
+           }
      };
 
     if let Err(e) = result {

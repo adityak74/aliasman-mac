@@ -205,6 +205,7 @@ pub fn store_add_alias(
         source: crate::model::AliasSource::User,
         created_at: now,
         updated_at: now,
+    modified_by_user: false,
     });
 
     Ok(())
@@ -289,6 +290,7 @@ mod tests {
             source: AliasSource::User,
             created_at: 1715300000,
             updated_at: 1715300000,
+    modified_by_user: false,
         }
     }
 
@@ -318,6 +320,7 @@ mod tests {
                     source: AliasSource::User,
                     created_at: 0,
                     updated_at: 0,
+    modified_by_user: false,
                 },
                 AliasRecord {
                     name: "a_first".to_string(),
@@ -328,6 +331,7 @@ mod tests {
                     source: AliasSource::User,
                     created_at: 0,
                     updated_at: 0,
+    modified_by_user: false,
                 },
             ],
         };
@@ -351,6 +355,7 @@ mod tests {
                 source: AliasSource::User,
                 created_at: 0,
                 updated_at: 0,
+    modified_by_user: false,
             }],
         };
 
@@ -445,6 +450,7 @@ mod tests {
                     source: AliasSource::User,
                     created_at: 0,
                     updated_at: 0,
+    modified_by_user: false,
                 },
                 AliasRecord {
                     name: "zsh_only".to_string(),
@@ -455,6 +461,7 @@ mod tests {
                     source: AliasSource::User,
                     created_at: 0,
                     updated_at: 0,
+    modified_by_user: false,
                 },
             ],
         };

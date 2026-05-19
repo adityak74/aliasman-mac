@@ -146,6 +146,7 @@ pub fn build_imported_records(
             source: AliasSource::Imported,
             created_at: now,
             updated_at: now,
+    modified_by_user: false,
         });
     }
 
@@ -283,6 +284,7 @@ alias gs='git status'
                 source: AliasSource::User,
                 created_at: 100,
                 updated_at: 100,
+    modified_by_user: false,
             }],
         };
 

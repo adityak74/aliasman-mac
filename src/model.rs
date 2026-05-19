@@ -8,6 +8,8 @@ pub struct AliasRecord {
     pub source: AliasSource,
     pub created_at: u64,
     pub updated_at: u64,
+    #[serde(default)]
+    pub modified_by_user: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -18,10 +20,11 @@ pub enum AliasShell {
     Bash,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum AliasSource {
     User,
     Imported,
     Suggested,
+    Pack(String),
 }
