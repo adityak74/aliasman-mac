@@ -20,8 +20,11 @@ Manage your `zsh`/`bash` aliases from the CLI — add, update, delete, list, and
 
 ## Installation
 
+### Homebrew
+
 ```bash
-cargo install --path .
+brew tap adityak74/aliasman
+brew install aliasman
 ```
 
 Then initialize for your shell:
@@ -31,6 +34,18 @@ aliasman init
 ```
 
 This auto-detects your shell, imports any existing aliases, and injects a managed block into your shell config.
+
+### From source
+
+```bash
+cargo install --path .
+```
+
+Then initialize for your shell:
+
+```bash
+aliasman init
+```
 
 ---
 
