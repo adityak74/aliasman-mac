@@ -1,39 +1,57 @@
 # aliasman
 
-A terminal alias manager for macOS with semantic search, shell history analytics, and Claude Code integration.
+<p align="center">
+  <img src="https://img.shields.io/github/v/release/adityak74/aliasman?style=flat-square&color=orange&label=version" alt="Version" />
+  <img src="https://img.shields.io/badge/rust-1.75%2B-orange?style=flat-square&logo=rust" alt="Rust" />
+  <img src="https://img.shields.io/badge/platform-macOS-lightgrey?style=flat-square&logo=apple" alt="macOS" />
+  <img src="https://img.shields.io/github/license/adityak74/aliasman?style=flat-square" alt="License" />
+  <img src="https://img.shields.io/github/stars/adityak74/aliasman?style=flat-square&color=yellow" alt="Stars" />
+  <img src="https://img.shields.io/badge/homebrew-tap-brown?style=flat-square&logo=homebrew" alt="Homebrew" />
+</p>
 
-Manage your `zsh`/`bash` aliases from the CLI — add, update, delete, list, and search — without ever manually editing your shell config.
+<p align="center">
+  <strong>A terminal alias manager for macOS with semantic search, shell history analytics, and Claude Code integration.</strong>
+</p>
+
+<p align="center">
+  Manage your <code>zsh</code>/<code>bash</code> aliases from the CLI — add, update, delete, list, and search — without ever manually editing your shell config.
+</p>
+
+---
+
+<p align="center">
+  <a href="#installation">Install</a> •
+  <a href="#commands">Commands</a> •
+  <a href="#claude-code-integration">Claude Code</a> •
+  <a href="#mcp-server">MCP</a> •
+  <a href="#requirements">Requirements</a>
+</p>
 
 ---
 
 ## Features
 
-- **CRUD for aliases** — add, update, delete, list with tags and descriptions
-- **Shell history analytics** — see your most-used commands and get alias suggestions
-- **Semantic search** — find aliases by meaning using local embeddings (LanceDB + Ollama)
-- **MCP server** — expose alias search to Claude and other MCP-compatible tools
-- **Claude Code hook** — injects your aliases into Claude's session context intelligently (token-budget aware)
-- **Safe shell injection** — writes a managed block into your `.zshrc`/`.bashrc`, never corrupts the file
-- **Atomic persistence** — TOML data store with timestamped backups
+| Feature | Description |
+|---|---|
+| **Alias CRUD** | Add, update, delete, and list aliases with tags and descriptions |
+| **History analytics** | See your most-used commands and get alias suggestions |
+| **Semantic search** | Find aliases by meaning using local embeddings (LanceDB + Ollama) |
+| **MCP server** | Expose alias search to Claude and other MCP-compatible tools |
+| **Claude Code hook** | Injects your aliases into Claude's session context (token-budget aware) |
+| **Safe shell injection** | Writes a managed block into `.zshrc`/`.bashrc` — never corrupts the file |
+| **Alias packs** | Install, share, and manage curated alias collections (k8s, docker, and more) |
+| **Atomic persistence** | TOML data store with timestamped backups |
 
 ---
 
 ## Installation
 
-### Homebrew
+### Homebrew (recommended)
 
 ```bash
 brew tap adityak74/aliasman
 brew install aliasman
 ```
-
-Then initialize for your shell:
-
-```bash
-aliasman init
-```
-
-This auto-detects your shell, imports any existing aliases, and injects a managed block into your shell config.
 
 ### From source
 
@@ -41,11 +59,15 @@ This auto-detects your shell, imports any existing aliases, and injects a manage
 cargo install --path .
 ```
 
-Then initialize for your shell:
+### Initialize
+
+After installing, run:
 
 ```bash
 aliasman init
 ```
+
+This auto-detects your shell, imports any existing aliases, and injects a managed block into your shell config.
 
 ---
 
@@ -81,6 +103,26 @@ aliasman suggest
 
 # Apply a suggestion
 aliasman suggest --apply <alias-name>
+```
+
+### Alias packs
+
+```bash
+# Install the built-in k8s pack
+aliasman pack install-builtin k8s
+
+# Install a pack from a file or URL
+aliasman pack install ./my-pack.toml
+aliasman pack install https://example.com/packs/docker.toml
+
+# List installed packs
+aliasman pack list
+
+# Remove a pack
+aliasman pack remove k8s
+
+# Create a pack from your current aliases
+aliasman pack create --name my-aliases --tag work
 ```
 
 ### Semantic search
@@ -127,7 +169,14 @@ Exposes an `alias_search` tool that MCP clients can call to find relevant aliase
 | File | Purpose |
 |---|---|
 | `~/.config/aliasman/aliases.toml` | Canonical alias store |
+| `~/.config/aliasman/packs/` | Installed pack files |
 | `~/.aliases` | Generated shell alias file (sourced by your shell config) |
+
+---
+
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=adityak74/aliasman&type=Date)](https://star-history.com/#adityak74/aliasman&Date)
 
 ---
 
@@ -138,6 +187,18 @@ Exposes an `alias_search` tool that MCP clients can call to find relevant aliase
 
 ---
 
+## Contributing
+
+Issues and PRs are welcome. See [GitHub Issues](https://github.com/adityak74/aliasman/issues) to report bugs or request features.
+
+---
+
 ## License
 
 MIT
+
+---
+
+<p align="center">
+  If <strong>aliasman</strong> saves you time, consider giving it a ⭐ on <a href="https://github.com/adityak74/aliasman">GitHub</a> — it helps others find the project.
+</p>
