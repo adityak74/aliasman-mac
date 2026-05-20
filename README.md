@@ -1,16 +1,16 @@
 # aliasman
 
 <p align="center">
-  <img src="https://img.shields.io/github/v/release/adityak74/aliasman?style=flat-square&color=orange&label=version" alt="Version" />
+  <img src="https://img.shields.io/github/v/release/adityak74/aliasman-mac?style=flat-square&color=orange&label=version" alt="Version" />
   <img src="https://img.shields.io/badge/rust-1.75%2B-orange?style=flat-square&logo=rust" alt="Rust" />
   <img src="https://img.shields.io/badge/platform-macOS-lightgrey?style=flat-square&logo=apple" alt="macOS" />
-  <img src="https://img.shields.io/github/license/adityak74/aliasman?style=flat-square" alt="License" />
-  <img src="https://img.shields.io/github/stars/adityak74/aliasman?style=flat-square&color=yellow" alt="Stars" />
+  <img src="https://img.shields.io/github/license/adityak74/aliasman-mac?style=flat-square" alt="License" />
+  <img src="https://img.shields.io/github/stars/adityak74/aliasman-mac?style=flat-square&color=yellow" alt="Stars" />
   <img src="https://img.shields.io/badge/homebrew-tap-brown?style=flat-square&logo=homebrew" alt="Homebrew" />
 </p>
 
 <p align="center">
-  <strong>A terminal alias manager for macOS with semantic search, shell history analytics, and Claude Code integration.</strong>
+  <strong>An AI-harness based alias manager for macOS — semantic search, shell history analytics, and native Claude Code integration.</strong>
 </p>
 
 <p align="center">
@@ -176,7 +176,7 @@ Exposes an `alias_search` tool that MCP clients can call to find relevant aliase
 
 ## Star History
 
-[![Star History Chart](https://api.star-history.com/svg?repos=adityak74/aliasman&type=Date)](https://star-history.com/#adityak74/aliasman&Date)
+[![Star History Chart](https://api.star-history.com/svg?repos=adityak74/aliasman-mac&type=Date)](https://star-history.com/#adityak74/aliasman-mac&Date)
 
 ---
 
@@ -200,5 +200,5 @@ MIT
 ---
 
 <p align="center">
-  If <strong>aliasman</strong> saves you time, consider giving it a ⭐ on <a href="https://github.com/adityak74/aliasman">GitHub</a> — it helps others find the project.
+  If <strong>aliasman</strong> saves you time, consider giving it a ⭐ on <a href="https://github.com/adityak74/aliasman-mac">GitHub</a> — it helps others find the project.
 </p>
