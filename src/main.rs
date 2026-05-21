@@ -891,7 +891,7 @@ fn run_hook(
                  }
                 println!("Hook command: {}", preview.hook_command);
                 if preview.has_existing_hooks {
-                    println!("Note: existing hooks will be replaced by aliasman hook.");
+                    println!("Note: only SessionStart hook will be added/updated by aliasman. Other hooks are preserved.");
                  } else {
                     println!("No existing hooks detected.");
                  }

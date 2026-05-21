@@ -63,14 +63,17 @@ pub fn merge_aliasman_hook(
          .entry("hooks".to_string())
          .or_insert_with(|| serde_json::json!({}));
 
-     // Set SessionStart hook
-    *hooks = serde_json::json!({
-        "SessionStart": {
-            "command": hook_command,
-            "success": true,
-            "suppressOutput": true
-        }
-    });
+      // Merge SessionStart into existing hooks instead of replacing everything
+    if let Some(hooks_obj) = hooks.as_object_mut() {
+        let session_start = hooks_obj
+              .entry("SessionStart")
+              .or_insert_with(|| serde_json::json!({}));
+        if let Some(ss_obj) = session_start.as_object_mut() {
+            ss_obj.insert("command".to_string(), serde_json::json!(hook_command));
+            ss_obj.insert("success".to_string(), serde_json::json!(true));
+            ss_obj.insert("suppressOutput".to_string(), serde_json::json!(true));
+          }
+      }
 
     new_settings
 }
@@ -480,6 +483,30 @@ mod tests {
         assert_eq!(merged.other.get("model").unwrap(), &serde_json::json!("sonnet"));
         assert!(merged.other.contains_key("hooks"));
     }
+
+       #[test]
+    fn merge_preserves_existing_hooks() {
+        let mut other = HashMap::new();
+        other.insert("hooks".to_string(), serde_json::json!({
+             "SessionStart": {"command": "echo existing"},
+             "SessionEnd": {"command": "echo goodbye"},
+             "PreToolUse": {"command": "echo before"}
+         }));
+
+        let settings = ClaudeSettings { other };
+        let merged = merge_aliasman_hook(&settings, "/path/to/aliasman hook --shell claude");
+
+         // SessionStart should be updated
+        let hooks = merged.other.get("hooks").unwrap().as_object().unwrap();
+        let ss = hooks.get("SessionStart").unwrap().as_object().unwrap();
+        assert_eq!(ss.get("command").unwrap(), &serde_json::json!("/path/to/aliasman hook --shell claude"));
+
+         // Other hooks should be preserved
+        assert!(hooks.contains_key("SessionEnd"), "SessionEnd should be preserved");
+        assert!(hooks.contains_key("PreToolUse"), "PreToolUse should be preserved");
+        assert_eq!(hooks.get("SessionEnd").unwrap().get("command").unwrap(), &serde_json::json!("echo goodbye"));
+        assert_eq!(hooks.get("PreToolUse").unwrap().get("command").unwrap(), &serde_json::json!("echo before"));
+      }
 
      #[test]
     fn format_alias_context_returns_markdown_table() {
