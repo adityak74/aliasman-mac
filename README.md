@@ -50,7 +50,7 @@
 
 ```bash
 brew tap adityak74/aliasman
-brew install aliasman
+brew install adityak74/aliasman/aliasman
 ```
 
 ### From source
