@@ -180,6 +180,10 @@ Exposes an `alias_search` tool that MCP clients can call to find relevant aliase
 
 ---
 
+## Recent Updates
+
+**v0.1.1** — `aliasman hook install` now preserves existing Claude Code hooks (SessionEnd, PreToolUse, etc.) instead of replacing the entire `hooks` object in `settings.json`.
+
 ## Requirements
 
 - **Rust** 1.75+
